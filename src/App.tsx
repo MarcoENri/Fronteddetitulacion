@@ -12,6 +12,9 @@ import StudentDetailPage from "./pages/StudentDetailPage";
 import CoordinatorStudentsPage from "./pages/CoordinatorStudentsPage";
 import CoordinatorStudentDetailPage from "./pages/CoordinatorStudentDetailPage";
 
+import AdminCreateUserPage from "./pages/AdminCreateUserPage";
+
+
 import { api } from "./api/api";
 
 type MeDto = { username: string; roles: string[] };
@@ -107,6 +110,15 @@ export default function App() {
             </RequireRole>
           }
         />
+        <Route
+  path="/admin/users/new"
+  element={
+    <RequireRole role="ROLE_ADMIN">
+      <AdminCreateUserPage />
+    </RequireRole>
+  }
+/>
+
 
         {/* COORDINATOR */}
         <Route

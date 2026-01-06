@@ -7,11 +7,19 @@ import type { AdminStudentRow } from "../services/adminStudentService";
 import { logout } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 
+import AssignStudentModal from "../components/AssignStudentModal";
+import AssignCareerModal from "../components/AssignCareerModal";
+
 export default function AdminStudentsPage() {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [rows, setRows] = useState<AdminStudentRow[]>([]);
   const nav = useNavigate();
+
+  const [openAssignStudent, setOpenAssignStudent] = useState(false);
+  const [assignStudentId, setAssignStudentId] = useState<number | null>(null);
+
+  const [openAssignCareer, setOpenAssignCareer] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -56,15 +64,23 @@ export default function AdminStudentsPage() {
     <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
       <Space style={{ width: "100%", justifyContent: "space-between", marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>Admin · Estudiantes</h2>
-        <Button
-          danger
-          onClick={() => {
-            logout();
-            nav("/");
-          }}
-        >
-          Cerrar sesión
-        </Button>
+        <Space>
+          <Button onClick={() => setOpenAssignCareer(true)}>Asignación masiva</Button>
+
+          <Button type="primary" onClick={() => nav("/admin/users/new")}>
+            Crear usuario
+          </Button>
+
+          <Button
+            danger
+            onClick={() => {
+              logout();
+              nav("/");
+            }}
+          >
+            Cerrar sesión
+          </Button>
+        </Space>
       </Space>
 
       <Card title="Carga masiva desde Excel (.xlsx)" style={{ marginBottom: 16 }}>
@@ -102,19 +118,42 @@ export default function AdminStudentsPage() {
             { title: "Estado", dataIndex: "status" },
             { title: "Incidencias", dataIndex: "incidentCount" },
             { title: "Observaciones", dataIndex: "observationCount" },
-
-            // ✅ NUEVA COLUMNA: Detalle
             {
               title: "Acción",
               render: (_, row) => (
-                <Button type="link" onClick={() => nav(`/admin/students/${row.id}`)}>
-                  Ver detalle
-                </Button>
+                <Space>
+                  <Button type="link" onClick={() => nav(`/admin/students/${row.id}`)}>
+                    Ver detalle
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setAssignStudentId(row.id);
+                      setOpenAssignStudent(true);
+                    }}
+                  >
+                    Asignar
+                  </Button>
+                </Space>
               ),
             },
           ]}
         />
       </Card>
+
+      {/* ✅ MODAL: asignar 1 estudiante */}
+      <AssignStudentModal
+        open={openAssignStudent}
+        studentId={assignStudentId}
+        onClose={() => setOpenAssignStudent(false)}
+        onSuccess={load}
+      />
+
+      {/* ✅ MODAL: asignación masiva */}
+      <AssignCareerModal
+        open={openAssignCareer}
+        onClose={() => setOpenAssignCareer(false)}
+        onSuccess={load}
+      />
     </div>
   );
 }
