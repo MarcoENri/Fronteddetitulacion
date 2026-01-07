@@ -12,8 +12,9 @@ import StudentDetailPage from "./pages/StudentDetailPage";
 import CoordinatorStudentsPage from "./pages/CoordinatorStudentsPage";
 import CoordinatorStudentDetailPage from "./pages/CoordinatorStudentDetailPage";
 
-import AdminCreateUserPage from "./pages/AdminCreateUserPage";
-
+// TUTOR
+import TutorStudentsPage from "./pages/TutorStudentsPage";
+import TutorStudentDetailPage from "./pages/TutorStudentDetailPage";
 
 import { api } from "./api/api";
 
@@ -110,15 +111,6 @@ export default function App() {
             </RequireRole>
           }
         />
-        <Route
-  path="/admin/users/new"
-  element={
-    <RequireRole role="ROLE_ADMIN">
-      <AdminCreateUserPage />
-    </RequireRole>
-  }
-/>
-
 
         {/* COORDINATOR */}
         <Route
@@ -134,6 +126,24 @@ export default function App() {
           element={
             <RequireRole role="ROLE_COORDINATOR">
               <CoordinatorStudentDetailPage />
+            </RequireRole>
+          }
+        />
+
+        {/* TUTOR */}
+        <Route
+          path="/tutor"
+          element={
+            <RequireRole role="ROLE_TUTOR">
+              <TutorStudentsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/tutor/students/:id"
+          element={
+            <RequireRole role="ROLE_TUTOR">
+              <TutorStudentDetailPage />
             </RequireRole>
           }
         />

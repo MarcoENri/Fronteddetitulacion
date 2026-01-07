@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 import AssignStudentModal from "../components/AssignStudentModal";
 import AssignCareerModal from "../components/AssignCareerModal";
+import CreateUserModal from "../components/CreateUserModal";
 
 export default function AdminStudentsPage() {
   const [loading, setLoading] = useState(false);
@@ -20,6 +21,9 @@ export default function AdminStudentsPage() {
   const [assignStudentId, setAssignStudentId] = useState<number | null>(null);
 
   const [openAssignCareer, setOpenAssignCareer] = useState(false);
+
+  // ✅ nuevo modal
+  const [openCreateUser, setOpenCreateUser] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -67,7 +71,8 @@ export default function AdminStudentsPage() {
         <Space>
           <Button onClick={() => setOpenAssignCareer(true)}>Asignación masiva</Button>
 
-          <Button type="primary" onClick={() => nav("/admin/users/new")}>
+          {/* ✅ ahora abre modal */}
+          <Button type="primary" onClick={() => setOpenCreateUser(true)}>
             Crear usuario
           </Button>
 
@@ -153,6 +158,16 @@ export default function AdminStudentsPage() {
         open={openAssignCareer}
         onClose={() => setOpenAssignCareer(false)}
         onSuccess={load}
+      />
+
+      {/* ✅ MODAL: crear usuario */}
+      <CreateUserModal
+        open={openCreateUser}
+        onClose={() => setOpenCreateUser(false)}
+        onSuccess={() => {
+          // si luego haces página de usuarios, aquí refrescas
+          // por ahora no hace falta, pero lo dejo listo
+        }}
       />
     </div>
   );

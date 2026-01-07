@@ -1,7 +1,10 @@
-import { Card, Descriptions, Table, Tabs, Button, message } from "antd";
+import { Card, Descriptions, Table, Tabs, Button, message, Space } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/api";
+
+// ✅ NUEVO
+import SendEmailModal from "../components/SendEmailModal";
 
 type IncidentDto = {
   id: number;
@@ -45,6 +48,9 @@ export default function StudentDetailPage() {
   const [data, setData] = useState<StudentDetailDto | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // ✅ NUEVO: modal email
+  const [emailOpen, setEmailOpen] = useState(false);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -58,13 +64,20 @@ export default function StudentDetailPage() {
     }
   };
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+  }, [id]);
 
   return (
     <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
-      <Button onClick={() => nav("/admin")} style={{ marginBottom: 12 }}>
-        ← Volver
-      </Button>
+      <Space style={{ marginBottom: 12 }}>
+        <Button onClick={() => nav("/admin")}>← Volver</Button>
+
+        {/* ✅ NUEVO */}
+        <Button disabled={!data} onClick={() => setEmailOpen(true)}>
+          Enviar correo
+        </Button>
+      </Space>
 
       <Card loading={loading} title="Detalle del Estudiante">
         {data && (
@@ -122,6 +135,14 @@ export default function StudentDetailPage() {
                   ),
                 },
               ]}
+            />
+
+            {/* ✅ NUEVO: MODAL EMAIL */}
+            <SendEmailModal
+              open={emailOpen}
+              studentId={data.id}
+              studentEmail={data.email}
+              onClose={() => setEmailOpen(false)}
             />
           </>
         )}

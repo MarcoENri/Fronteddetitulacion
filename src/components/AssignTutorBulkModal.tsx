@@ -1,6 +1,7 @@
 import { Modal, Form, InputNumber, Input, message } from "antd";
 import { useState } from "react";
-import { assignProject } from "../services/coordinatorService";
+import { assignProject } from "../services/coordinatorStudentService";
+
 
 type Props = {
   open: boolean;

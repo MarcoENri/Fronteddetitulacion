@@ -9,28 +9,24 @@ import {
   Input,
   DatePicker,
   message,
-  Select,
   Space,
+  Tag,
 } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
-  getStudentDetail,
-  createIncident,
-  createObservation,
-  assignProject,
-} from "../services/coordinatorStudentService";
+  getTutorStudentDetail,
+  createTutorIncident,
+  createTutorObservation,
+} from "../services/tutorService";
 
-import type { StudentDetailDto } from "../services/coordinatorStudentService";
-import { listTutorsForCoordinator } from "../services/coordinatorLookupService";
-import type { UserOption } from "../services/adminLookupService";
+import type { StudentDetailDto } from "../services/tutorService";
 
+// ✅ NUEVO
 import SendEmailModal from "../components/SendEmailModal";
 
-type AssignForm = { projectName: string; tutorId: number };
-
-export default function CoordinatorStudentDetailPage() {
+export default function TutorStudentDetailPage() {
   const nav = useNavigate();
   const { id } = useParams<{ id: string }>();
 
@@ -40,24 +36,19 @@ export default function CoordinatorStudentDetailPage() {
   const [incidentOpen, setIncidentOpen] = useState(false);
   const [obsOpen, setObsOpen] = useState(false);
 
-  // ✅ modal asignar proyecto + tutor
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assignLoading, setAssignLoading] = useState(false);
-  const [tutors, setTutors] = useState<UserOption[]>([]);
-  const [assignForm] = Form.useForm<AssignForm>();
-
-  // ✅ modal email
+  // ✅ NUEVO: modal email
   const [emailOpen, setEmailOpen] = useState(false);
 
   const load = async () => {
     if (!id) return;
     setLoading(true);
     try {
-      const res = await getStudentDetail(id);
+      const res = await getTutorStudentDetail(id);
       setData(res);
     } catch (e: any) {
       message.error(e?.response?.data?.message ?? "No se pudo cargar el estudiante");
-      nav("/coordinator", { replace: true });
+      // ✅ si falla, vuelve a la lista del tutor
+      nav("/tutor", { replace: true });
     } finally {
       setLoading(false);
     }
@@ -65,48 +56,32 @@ export default function CoordinatorStudentDetailPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
-  const openAssignModal = async () => {
-    try {
-      const tuts = await listTutorsForCoordinator();
-      setTutors(tuts);
-
-      assignForm.setFieldsValue({
-        projectName: data?.thesisProject ?? "",
-        tutorId: (data?.tutorId ?? undefined) as any,
-      });
-
-      setAssignOpen(true);
-    } catch (e: any) {
-      message.error(e?.response?.data?.message ?? "No se pudo cargar tutores");
-    }
-  };
 
   if (!data) return null;
 
   return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
-      <Space style={{ marginBottom: 12 }}>
-        <Button onClick={() => nav("/coordinator")}>⬅ Volver</Button>
+    <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
+      <Space style={{ width: "100%", justifyContent: "space-between", marginBottom: 12 }}>
+        <Space>
+          <Button onClick={() => nav("/tutor")}>← Volver a la lista</Button>
 
-        <Button type="primary" onClick={openAssignModal}>
-          Asignar proyecto y tutor
-        </Button>
-
-        <Button onClick={() => setEmailOpen(true)}>
-          Enviar correo
-        </Button>
+          {/* ✅ NUEVO */}
+          <Button onClick={() => setEmailOpen(true)}>Enviar correo</Button>
+        </Space>
       </Space>
 
-      <Card loading={loading} title="Detalle del estudiante">
+      <Card loading={loading} title="Detalle del estudiante (Tutor)">
         <Descriptions bordered size="small" column={2}>
           <Descriptions.Item label="Estudiante">
             {data.firstName} {data.lastName}
           </Descriptions.Item>
           <Descriptions.Item label="Email">{data.email}</Descriptions.Item>
           <Descriptions.Item label="Carrera">{data.career}</Descriptions.Item>
-          <Descriptions.Item label="Estado">{data.status}</Descriptions.Item>
+          <Descriptions.Item label="Estado">
+            <Tag>{data.status}</Tag>
+          </Descriptions.Item>
           <Descriptions.Item label="Proyecto">{data.thesisProject ?? "-"}</Descriptions.Item>
         </Descriptions>
 
@@ -128,6 +103,7 @@ export default function CoordinatorStudentDetailPage() {
                   </Button>
 
                   <Table
+                    style={{ marginTop: 12 }}
                     rowKey="id"
                     dataSource={data.incidents}
                     columns={[
@@ -145,11 +121,10 @@ export default function CoordinatorStudentDetailPage() {
               label: `Observaciones (${data.observationCount})`,
               children: (
                 <>
-                  <Button onClick={() => setObsOpen(true)}>
-                    Nueva observación
-                  </Button>
+                  <Button onClick={() => setObsOpen(true)}>Nueva observación</Button>
 
                   <Table
+                    style={{ marginTop: 12 }}
                     rowKey="id"
                     dataSource={data.observations}
                     columns={[
@@ -164,63 +139,7 @@ export default function CoordinatorStudentDetailPage() {
           ]}
         />
 
-        {/* ---------- MODAL ASIGNAR PROYECTO + TUTOR ---------- */}
-        <Modal
-          open={assignOpen}
-          title="Asignar proyecto y tutor"
-          okText="Guardar"
-          confirmLoading={assignLoading}
-          onCancel={() => setAssignOpen(false)}
-          onOk={async () => {
-            if (!id) return;
-            try {
-              const values = await assignForm.validateFields();
-              setAssignLoading(true);
-
-              await assignProject(id, {
-                projectName: values.projectName.trim(),
-                tutorId: values.tutorId,
-              });
-
-              message.success("Proyecto y tutor asignados ✅");
-              setAssignOpen(false);
-              await load();
-            } catch (e: any) {
-              if (e?.errorFields) return;
-              message.error(e?.response?.data?.message ?? "No se pudo asignar");
-            } finally {
-              setAssignLoading(false);
-            }
-          }}
-        >
-          <Form layout="vertical" form={assignForm}>
-            <Form.Item
-              name="projectName"
-              label="Nombre del proyecto"
-              rules={[{ required: true, message: "Escribe el nombre del proyecto" }]}
-            >
-              <Input placeholder="Ej: Sistema Web para Gestión de Titulación" />
-            </Form.Item>
-
-            <Form.Item
-              name="tutorId"
-              label="Tutor"
-              rules={[{ required: true, message: "Selecciona un tutor" }]}
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Selecciona tutor"
-                options={tutors.map((u) => ({
-                  value: u.id,
-                  label: `${u.fullName} (@${u.username})`,
-                }))}
-              />
-            </Form.Item>
-          </Form>
-        </Modal>
-
-        {/* ---------- MODAL EMAIL ---------- */}
+        {/* ✅ NUEVO: MODAL EMAIL */}
         <SendEmailModal
           open={emailOpen}
           studentId={data.id}
@@ -234,19 +153,24 @@ export default function CoordinatorStudentDetailPage() {
           title="Registrar incidencia"
           onCancel={() => setIncidentOpen(false)}
           footer={null}
+          destroyOnClose
         >
           <Form
             layout="vertical"
             onFinish={async (v) => {
-              await createIncident(id!, {
-                stage: v.stage,
-                date: v.date.format("YYYY-MM-DD"),
-                reason: v.reason,
-                action: v.action,
-              });
-              message.success("Incidencia registrada");
-              setIncidentOpen(false);
-              load();
+              try {
+                await createTutorIncident(id!, {
+                  stage: v.stage,
+                  date: v.date.format("YYYY-MM-DD"),
+                  reason: v.reason,
+                  action: v.action,
+                });
+                message.success("Incidencia registrada");
+                setIncidentOpen(false);
+                load();
+              } catch (e: any) {
+                message.error(e?.response?.data?.message ?? "No se pudo registrar incidencia");
+              }
             }}
           >
             <Form.Item name="stage" label="Etapa" rules={[{ required: true }]}>
@@ -261,9 +185,13 @@ export default function CoordinatorStudentDetailPage() {
             <Form.Item name="action" label="Acción" rules={[{ required: true }]}>
               <Input.TextArea />
             </Form.Item>
-            <Button htmlType="submit" type="primary" danger block>
-              Guardar
-            </Button>
+
+            <Space>
+              <Button onClick={() => setIncidentOpen(false)}>Cancelar</Button>
+              <Button htmlType="submit" type="primary" danger>
+                Guardar
+              </Button>
+            </Space>
           </Form>
         </Modal>
 
@@ -273,22 +201,31 @@ export default function CoordinatorStudentDetailPage() {
           title="Registrar observación"
           onCancel={() => setObsOpen(false)}
           footer={null}
+          destroyOnClose
         >
           <Form
             layout="vertical"
             onFinish={async (v) => {
-              await createObservation(id!, { text: v.text });
-              message.success("Observación registrada");
-              setObsOpen(false);
-              load();
+              try {
+                await createTutorObservation(id!, { text: v.text });
+                message.success("Observación registrada");
+                setObsOpen(false);
+                load();
+              } catch (e: any) {
+                message.error(e?.response?.data?.message ?? "No se pudo registrar observación");
+              }
             }}
           >
             <Form.Item name="text" label="Observación" rules={[{ required: true }]}>
               <Input.TextArea />
             </Form.Item>
-            <Button htmlType="submit" type="primary" block>
-              Guardar
-            </Button>
+
+            <Space>
+              <Button onClick={() => setObsOpen(false)}>Cancelar</Button>
+              <Button htmlType="submit" type="primary">
+                Guardar
+              </Button>
+            </Space>
           </Form>
         </Modal>
       </Card>
