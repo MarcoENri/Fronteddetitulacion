@@ -6,7 +6,7 @@ export type CreateUserRequest = {
   password: string;
   fullName: string;
   email: string;
-  roles: Array<"ROLE_ADMIN" | "ROLE_COORDINATOR" | "ROLE_TUTOR">;
+  roles: Array<"ADMIN" | "COORDINATOR" | "TUTOR">;
 };
 
 export type UserResponse = {
@@ -31,8 +31,6 @@ export async function listUsers(role?: string): Promise<UserResponse[]> {
   return res.data;
 }
 
-export async function listUsersByRole(
-  role: "ROLE_COORDINATOR" | "ROLE_TUTOR"
-): Promise<UserResponse[]> {
+export async function listUsersByRole(role: "COORDINATOR" | "TUTOR"): Promise<UserResponse[]> {
   return listUsers(role);
 }

@@ -17,10 +17,10 @@ export type CoordinatorStudentRow = {
 export type IncidentDto = {
   id: number;
   stage: string;
-  date: string;      // LocalDate -> string en JSON
+  date: string;
   reason: string;
   action: string;
-  createdAt: string; // LocalDateTime -> string
+  createdAt: string;
   createdByUserId?: number | null;
 };
 
@@ -58,7 +58,7 @@ export type StudentDetailDto = {
 
 export type CreateIncidentRequest = {
   stage: string;
-  date: string; // "2026-01-01"
+  date: string;
   reason: string;
   action: string;
 };
@@ -67,20 +67,33 @@ export type CreateObservationRequest = {
   text: string;
 };
 
-export async function listCoordinatorStudents() {
+export async function listCoordinatorStudents(): Promise<CoordinatorStudentRow[]> {
   const res = await api.get<CoordinatorStudentRow[]>("/coordinator/students");
   return res.data;
 }
 
-export async function getCoordinatorStudentDetail(id: number | string) {
+export async function getCoordinatorStudentDetail(id: number | string): Promise<StudentDetailDto> {
   const res = await api.get<StudentDetailDto>(`/coordinator/students/${id}`);
   return res.data;
 }
 
-export async function createCoordinatorIncident(studentId: number | string, body: CreateIncidentRequest) {
+export async function createCoordinatorIncident(
+  studentId: number | string,
+  body: CreateIncidentRequest
+): Promise<void> {
   await api.post(`/coordinator/students/${studentId}/incidents`, body);
 }
 
-export async function createCoordinatorObservation(studentId: number | string, body: CreateObservationRequest) {
+export async function createCoordinatorObservation(
+  studentId: number | string,
+  body: CreateObservationRequest
+): Promise<void> {
   await api.post(`/coordinator/students/${studentId}/observations`, body);
+}
+
+// ✅ NUEVO: asignar tutor + proyecto
+export type AssignProjectRequest = { projectName: string; tutorId: number };
+
+export async function assignProject(studentId: number, body: AssignProjectRequest): Promise<void> {
+  await api.put(`/coordinator/students/${studentId}/project`, body);
 }

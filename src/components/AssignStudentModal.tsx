@@ -30,8 +30,8 @@ export default function AssignStudentModal({ open, studentId, onClose, onSuccess
     (async () => {
       try {
         const [coords, tuts] = await Promise.all([
-          listUsersByRole("ROLE_COORDINATOR"),
-          listUsersByRole("ROLE_TUTOR"),
+          listUsersByRole("COORDINATOR"),
+          listUsersByRole("TUTOR"),
         ]);
         setCoordinators(coords);
         setTutors(tuts);
@@ -58,7 +58,7 @@ export default function AssignStudentModal({ open, studentId, onClose, onSuccess
       onClose();
       form.resetFields();
     } catch (e: any) {
-      if (e?.errorFields) return; // validación de antd
+      if (e?.errorFields) return;
       message.error(e?.response?.data?.message ?? "Error al asignar");
     } finally {
       setLoading(false);

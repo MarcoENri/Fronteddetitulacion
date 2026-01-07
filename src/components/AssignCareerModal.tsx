@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { CareerOption, UserOption } from "../services/adminLookupService";
 import { listCareers, listUsersByRole } from "../services/adminLookupService";
 import { assignCareer } from "../services/adminAssignService";
+import { assignCareersToUser } from "../services/adminCareersToUserService";
 
 type Props = {
   open: boolean;
@@ -33,8 +34,8 @@ export default function AssignCareerModal({ open, onClose, onSuccess }: Props) {
       try {
         const [cs, coords, tuts] = await Promise.all([
           listCareers(),
-          listUsersByRole("ROLE_COORDINATOR"),
-          listUsersByRole("ROLE_TUTOR"),
+          listUsersByRole("COORDINATOR"),
+          listUsersByRole("TUTOR"),
         ]);
         setCareers(cs);
         setCoordinators(coords);
@@ -44,13 +45,17 @@ export default function AssignCareerModal({ open, onClose, onSuccess }: Props) {
         message.error(e?.response?.data?.message ?? "No se pudo cargar datos");
       }
     })();
-  }, [open]);
+  }, [open, form]);
 
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
 
+      // ✅ Paso 1: asegurar user_career para evitar error de backend
+      await assignCareersToUser(values.coordinatorId, [values.careerId]);
+
+      // ✅ Paso 2: asignación masiva real
       await assignCareer(values.careerId, {
         coordinatorId: values.coordinatorId,
         tutorId: values.tutorId ?? null,
@@ -129,7 +134,11 @@ export default function AssignCareerModal({ open, onClose, onSuccess }: Props) {
           <Input placeholder="Si lo llenas, se asigna a todos los estudiantes del filtro" />
         </Form.Item>
 
-        <Form.Item label="Solo estudiantes no asignados" name="onlyUnassigned" valuePropName="checked">
+        <Form.Item
+          label="Solo estudiantes no asignados"
+          name="onlyUnassigned"
+          valuePropName="checked"
+        >
           <Switch />
         </Form.Item>
       </Form>
