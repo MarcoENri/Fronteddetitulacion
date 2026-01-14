@@ -8,7 +8,10 @@ export async function listCareers(): Promise<CareerOption[]> {
   return res.data;
 }
 
-export async function listUsersByRole(role: "ROLE_COORDINATOR" | "ROLE_TUTOR"): Promise<UserOption[]> {
+// 👇 IMPORTANTE: sin ROLE_
+export async function listUsersByRole(
+  role: "COORDINATOR" | "TUTOR"
+): Promise<UserOption[]> {
   const res = await api.get<UserOption[]>(`/admin/users`, { params: { role } });
   return res.data;
 }
