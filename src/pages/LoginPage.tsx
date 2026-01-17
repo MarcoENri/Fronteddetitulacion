@@ -1,30 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { api } from "../api/api";
-
-// ================= MUI =================
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Paper,
   Typography,
   TextField,
   Button,
   IconButton,
-  Tooltip,
-  Divider,
   InputAdornment,
+  Collapse,
+  Link,
+  Avatar,
 } from "@mui/material";
 
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
-import ArrowForwardIosRoundedIcon from "@mui/icons-material/ArrowForwardIosRounded";
+import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
-
-// ============== ICONOS SOCIALES =========
+import CloseIcon from '@mui/icons-material/Close';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { FaFacebookF, FaInstagram, FaWhatsapp, FaTiktok } from "react-icons/fa";
+import { FcGoogle } from "react-icons/fc"; 
 
 // ================= IMÁGENES ============
+import logoImg from "../assets/imagenes/LogoTec-Photoroom.png"; 
+import Gastronomia from "../assets/imagenes-Tec/Gastronomia.jpeg";
 import DesarrolloSoftware from "../assets/imagenes-Tec/Desarrolo-De-Software.jpeg";
 import RedesTelecom from "../assets/imagenes-Tec/Redes-y-Telecomunicaciones.jpeg";
 import DisenoGrafico from "../assets/imagenes-Tec/Diseno-Grafico.jpeg";
@@ -32,29 +31,22 @@ import Marketing from "../assets/imagenes-Tec/Marketing-Digital-y-Negocios.jpeg"
 import Contabilidad from "../assets/imagenes-Tec/Contabilidad-y-Asesoria-Tributaria.jpeg";
 import TalentoHumano from "../assets/imagenes-Tec/Talento-Humano.jpeg";
 import Enfermeria from "../assets/imagenes-Tec/Enfermeria.jpeg";
-import Gastronomia from "../assets/imagenes-Tec/Gastronomia.jpeg";
 import Electricidad from "../assets/imagenes-Tec/Electricidad.jpeg";
 
-// ================= TIPOS =================
-type LoginValues = { username: string; password: string };
-type LoginResponse = { token: string };
-type MeDto = { username: string; roles: string[] };
-
 export default function LoginPage() {
-  const nav = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+  const [bgRandom, setBgRandom] = useState("");
+  
+  const [showLogin, setShowLogin] = useState(() => {
+    const saved = localStorage.getItem("loginOpen");
+    return saved === "true";
+  });
 
-  const [values, setValues] = useState<LoginValues>({ username: "", password: "" });
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const brand = {
+    primary: "#008B8B", 
+  };
 
-  const brand = useMemo(() => ({
-    aqua: "#2EC4B6",
-    aquaDark: "#159A8C",
-    dark: "#071318",
-    dark2: "#050B10",
-  }), []);
-
-  const links = useMemo(() => ({
+  const socialLinks = useMemo(() => ({
     facebook: "https://www.facebook.com/institutosudamericano/",
     instagram: "https://www.instagram.com/itsudamericano",
     whatsapp: "https://api.whatsapp.com/send/?phone=593996976449",
@@ -67,143 +59,206 @@ export default function LoginPage() {
     Contabilidad, TalentoHumano, Enfermeria, Electricidad, DesarrolloSoftware,
   ], []);
 
-  // =============== LÓGICA DEL CARRUSEL ===============
-  const track = useMemo(() => [slides[slides.length - 1], ...slides, slides[0]], [slides]);
-  const [idxTrack, setIdxTrack] = useState(1);
-  const [anim, setAnim] = useState(true);
-  const timerRef = useRef<number | null>(null);
-
-  const goNext = () => setIdxTrack((p) => p + 1);
-  const goPrev = () => setIdxTrack((p) => p - 1);
+  // Mejora en la carga aleatoria de imagen
+  useEffect(() => {
+    const selectRandom = () => {
+      const idx = Math.floor(Math.random() * slides.length);
+      setBgRandom(slides[idx]);
+    };
+    selectRandom();
+  }, [slides]);
 
   useEffect(() => {
-    timerRef.current = window.setInterval(goNext, 5200);
-    return () => { if (timerRef.current) window.clearInterval(timerRef.current); };
-  }, []);
+    localStorage.setItem("loginOpen", showLogin.toString());
+  }, [showLogin]);
 
-  useEffect(() => {
-    if (idxTrack === track.length - 1) {
-      setTimeout(() => { setAnim(false); setIdxTrack(1); }, 540);
-    } else if (idxTrack === 0) {
-      setTimeout(() => { setAnim(false); setIdxTrack(track.length - 2); }, 540);
-    } else if (!anim) {
-      setTimeout(() => setAnim(true), 20);
-    }
-  }, [idxTrack, track.length, anim]);
-
-  const idxReal = useMemo(() => {
-    const raw = idxTrack - 1;
-    if (raw < 0) return slides.length - 1;
-    if (raw >= slides.length) return 0;
-    return raw;
-  }, [idxTrack, slides.length]);
-
-  // ================= LÓGICA DE LOGIN =================
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg("");
-    setLoading(true);
-
-    try {
-      const res = await api.post<LoginResponse>("/auth/login", values);
-      const token = res.data.token;
-      
-      // Persistencia para que no se cierre al cerrar la pestaña
-      localStorage.setItem("token", token);
-
-      const meRes = await api.get<MeDto>("/me");
-      const roles = meRes.data.roles ?? [];
-
-      if (roles.includes("ROLE_ADMIN")) nav("/admin", { replace: true });
-      else if (roles.includes("ROLE_COORDINATOR")) nav("/coordinator", { replace: true });
-      else if (roles.includes("ROLE_TUTOR")) nav("/tutor", { replace: true });
-      else {
-        setErrorMsg("Tu usuario no tiene rol asignado.");
-        localStorage.clear();
-      }
-    } catch (err: any) {
-      localStorage.clear();
-      setErrorMsg(err?.response?.data?.message ?? "Credenciales incorrectas");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleReload = () => window.location.reload();
 
   return (
-    <Box sx={{
-      minHeight: "100vh", px: 2, display: "flex", justifyContent: "center",
-      alignItems: "flex-start", pt: { xs: 4, md: 8 },
-      background: `radial-gradient(1200px 600px at 10% 10%, rgba(46,196,182,0.26), transparent 60%), radial-gradient(900px 500px at 90% 20%, rgba(21,154,140,0.18), transparent 55%), linear-gradient(180deg, ${brand.dark} 0%, ${brand.dark2} 100%)`,
+    <Box sx={{ 
+      minHeight: "100vh", 
+      position: "relative", 
+      overflowY: "auto", 
+      overflowX: "hidden",
+      backgroundColor: "#000" // Fondo base negro para evitar flash blanco
     }}>
-      <Box sx={{ width: "min(1120px, 100%)" }}>
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.35fr 1fr" }, gap: 2 }}>
-          
-          <Paper sx={{ position: "relative", overflow: "hidden", borderRadius: 5, minHeight: { xs: 360, md: 560 }, border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 22px 70px rgba(0,0,0,0.45)", backgroundColor: "rgba(0,0,0,0.25)" }}>
-            <Box sx={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-              <Box sx={{ height: "100%", display: "flex", width: `${track.length * 100}%`, transform: `translateX(-${idxTrack * (100 / track.length)}%)`, transition: anim ? "transform 520ms ease" : "none" }}>
-                {track.map((img, i) => (
-                  <Box key={i} sx={{ width: `${100 / track.length}%`, position: "relative" }}>
-                    <Box component="img" src={img} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} />
-                    <Box sx={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.06) 60%, rgba(46,196,182,0.10) 100%)" }} />
-                    <Box sx={{ position: "absolute", top: 0, right: 0, width: 10, height: "100%", background: `linear-gradient(180deg, ${brand.aqua} 0%, ${brand.aquaDark} 100%)`, opacity: 0.95 }} />
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-            <Box sx={{ position: "absolute", top: 16, right: 16, display: "flex", gap: 1, zIndex: 5 }}>
-              <IconButton onClick={goPrev} sx={navBtn}><ArrowBackIosNewRoundedIcon fontSize="small" /></IconButton>
-              <IconButton onClick={goNext} sx={navBtn}><ArrowForwardIosRoundedIcon fontSize="small" /></IconButton>
-            </Box>
-            <Box sx={{ position: "absolute", left: 18, bottom: 16, display: "flex", gap: 1, zIndex: 6, backgroundColor: "rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 999, px: 1.2, py: 0.8, backdropFilter: "blur(6px)" }}>
-              {slides.map((_, d) => (
-                <Box key={d} onClick={() => setIdxTrack(d + 1)} sx={{ width: d === idxReal ? 22 : 10, height: 10, borderRadius: 999, cursor: "pointer", transition: "all .25s ease", backgroundColor: d === idxReal ? "rgba(46,196,182,0.95)" : "rgba(255,255,255,0.22)", border: "1px solid rgba(255,255,255,0.12)" }} />
-              ))}
-            </Box>
-          </Paper>
+      
+      {/* FONDO FIJO CON TRANSICIÓN SUAVE */}
+      <Box 
+        sx={{ 
+          position: "fixed", 
+          top: 0, left: 0, right: 0, bottom: 0, 
+          zIndex: 0,
+          backgroundImage: bgRandom ? `url(${bgRandom})` : "none",
+          backgroundSize: "cover", 
+          backgroundPosition: "center 20%", 
+          backgroundRepeat: "no-repeat",
+          transition: "background-image 0.5s ease-in-out"
+        }} 
+      />
 
-          <Paper sx={{ borderRadius: 5, p: 3, border: "1px solid rgba(255,255,255,0.12)", backgroundColor: "rgba(255,255,255,0.06)", backdropFilter: "blur(10px)", boxShadow: "0 22px 70px rgba(0,0,0,0.45)", minHeight: { xs: 360, md: 560 }, display: "flex", flexDirection: "column" }}>
-            <Typography variant="h6" fontWeight={950} color="white">Iniciar sesión</Typography>
-            <Divider sx={{ my: 2, borderColor: "rgba(255,255,255,0.15)" }} />
+      {/* BOTÓN DE ACCESO REPARADO - LADO DERECHO */}
+      <Box 
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowLogin(true);
+        }}
+        sx={{ 
+          position: "absolute", 
+          top: showLogin ? -150 : 25, 
+          right: 25, 
+          zIndex: 20, // Más alto para que siempre sea clickable
+          display: "flex", 
+          alignItems: "center", 
+          gap: 2,
+          cursor: "pointer",
+          p: "8px 22px 8px 10px",
+          borderRadius: "50px",
+          background: "rgba(255, 255, 255, 0.25)",
+          backdropFilter: "blur(15px)",
+          border: "1px solid rgba(255, 255, 255, 0.4)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+          transition: "top 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s",
+          "&:hover": { 
+            transform: "scale(1.05)", 
+            background: "rgba(255, 255, 255, 0.4)" 
+          },
+          // Asegura que todo el contenido del box sea clickable
+          "& *": { pointerEvents: "none" } 
+        }}
+      >
+        <Avatar sx={{ bgcolor: brand.primary, width: 40, height: 40 }}>
+          <AccountCircleIcon sx={{ fontSize: 30 }} />
+        </Avatar>
+        <Typography sx={{ color: "#fff", fontWeight: 900, fontSize: "0.95rem", pointerEvents: "none" }}>
+          ACCESO
+        </Typography>
+      </Box>
+
+      {/* LOGIN DESPLEGABLE - LADO DERECHO */}
+      <Box sx={{ 
+        position: "absolute", 
+        top: 20, 
+        right: 20, 
+        zIndex: showLogin ? 21 : -1, // Solo sube el nivel si está abierto
+        width: "330px",
+        pb: 5,
+        pointerEvents: showLogin ? "auto" : "none" // Evita que bloquee clics si está cerrado
+      }}>
+        <Collapse in={showLogin} timeout={600}>
+          <Box sx={{ 
+            backgroundColor: "rgba(255, 255, 255, 0.98)", 
+            borderRadius: "28px", 
+            boxShadow: "0 30px 60px rgba(0,0,0,0.4)",
+            p: 3,
+            border: "1px solid rgba(255,255,255,0.6)",
+          }}>
+            <IconButton 
+              onClick={() => setShowLogin(false)}
+              size="small"
+              sx={{ position: "absolute", top: 12, right: 12, color: "#bbb" }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+
+            <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+              <Box 
+                component="img" 
+                src={logoImg} 
+                onClick={handleReload}
+                sx={{ width: "130px", cursor: "pointer", objectFit: "contain" }} 
+              />
+            </Box>
+
+            <Typography variant="body1" fontWeight={900} color="#222" textAlign="center" mb={2}>
+              SISTEMA ACADÉMICO
+            </Typography>
             
-            <Box component="form" onSubmit={onSubmit} sx={{ display: "grid", gap: 1.6 }}>
-              <TextField label="Usuario" value={values.username} onChange={(e) => setValues(v => ({...v, username: e.target.value}))}
-                InputProps={{ startAdornment: ( <InputAdornment position="start"><PersonOutlineRoundedIcon sx={{ color: "rgba(255,255,255,0.70)" }} /></InputAdornment> ) }}
-                sx={fieldStyle(brand)} />
+            <Box component="form" sx={{ display: "grid", gap: 0.5 }}>
               
-              <TextField label="Contraseña" type="password" value={values.password} onChange={(e) => setValues(v => ({...v, password: e.target.value}))}
-                InputProps={{ startAdornment: ( <InputAdornment position="start"><LockOutlinedIcon sx={{ color: "rgba(255,255,255,0.70)" }} /></InputAdornment> ) }}
-                sx={fieldStyle(brand)} />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1 }}>
+                <Link href="#" sx={{ fontSize: '0.7rem', color: brand.primary, textDecoration: 'none', fontWeight: 400 }}>¿Olvidó usuario?</Link>
+              </Box>
+              
+              <TextField 
+                placeholder="Usuario"
+                fullWidth
+                sx={fieldStyle(brand)}
+                InputProps={{ 
+                  startAdornment: <InputAdornment position="start"><PersonOutlineRoundedIcon fontSize="medium" sx={{color:brand.primary}}/></InputAdornment> 
+                }}
+              />
 
-              {errorMsg && <Box sx={{ borderRadius: 3, px: 1.5, py: 1, border: "1px solid rgba(239,68,68,0.45)", backgroundColor: "rgba(239,68,68,0.12)", color: "rgba(255,255,255,0.92)", fontSize: 14 }}>{errorMsg}</Box>}
+              <Box sx={{ mt: 1 }}>
+                <TextField 
+                  placeholder="Contraseña"
+                  type={showPassword ? "text" : "password"}
+                  fullWidth
+                  sx={fieldStyle(brand)}
+                  InputProps={{ 
+                    startAdornment: <InputAdornment position="start"><LockOutlinedIcon fontSize="medium" sx={{color:brand.primary}}/></InputAdornment>,
+                    endAdornment: (
+                      <IconButton onClick={() => setShowPassword(!showPassword)} size="small">
+                        {showPassword ? <VisibilityOffRoundedIcon sx={{fontSize: 22}}/> : <VisibilityRoundedIcon sx={{fontSize: 22}}/>}
+                      </IconButton>
+                    )
+                  }}
+                />
+              </Box>
 
-              <Button type="submit" disabled={loading} variant="contained" sx={{ mt: 0.5, height: 46, fontWeight: 950, borderRadius: 3, textTransform: "none", background: `linear-gradient(90deg, ${brand.aqua}, ${brand.aquaDark})`, "&:hover": { opacity: 0.95 } }}>
-                {loading ? "Ingresando..." : "INGRESAR"}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1, mt: 0.5 }}>
+                <Link href="#" sx={{ fontSize: '0.7rem', color: brand.primary, textDecoration: 'none', fontWeight: 400 }}>¿Olvidó contraseña?</Link>
+              </Box>
+              
+              <Button variant="contained" fullWidth sx={{ 
+                height: 44, fontWeight: 900, borderRadius: "50px", 
+                background: brand.primary, mt: 2, fontSize: "0.9rem", textTransform: 'none'
+              }}>
+                Ingresar
               </Button>
 
-              <Box sx={{ display: "flex", justifyContent: "center", gap: 1.4, mt: 2 }}>
-                <Social href={links.facebook} icon={<FaFacebookF />} label="Facebook" />
-                <Social href={links.instagram} icon={<FaInstagram />} label="Instagram" />
-                <Social href={links.whatsapp} icon={<FaWhatsapp />} label="WhatsApp" />
-                <Social href={links.tiktok} icon={<FaTiktok />} label="TikTok" />
-                <Social href={links.sga} icon={<LanguageRoundedIcon />} label="Web institucional" />
+              <Button variant="outlined" fullWidth startIcon={<FcGoogle size={20}/>} 
+                sx={{ 
+                  height: 42, borderRadius: "50px", color: "#444", 
+                  borderColor: "#ddd", textTransform: "none", fontWeight: 700, mt: 1,
+                  "&:hover": { borderColor: brand.primary, backgroundColor: "#fff" }
+                }}>
+                Continuar con Google
+              </Button>
+
+              <Box sx={{ mt: 2, textAlign: "center" }}>
+                <Box sx={{ display: "flex", justifyContent: "center", gap: 1.5 }}>
+                  <Social icon={<FaFacebookF size={18} />} color="#1877F2" link={socialLinks.facebook} />
+                  <Social icon={<FaInstagram size={18} />} color="#E4405F" link={socialLinks.instagram} />
+                  <Social icon={<FaWhatsapp size={18} />} color="#25D366" link={socialLinks.whatsapp} />
+                  <Social icon={<FaTiktok size={18} />} color="#000000" link={socialLinks.tiktok} />
+                  <Social icon={<LanguageRoundedIcon sx={{ fontSize: 22 }} />} color={brand.primary} link={socialLinks.sga} />
+                </Box>
               </Box>
             </Box>
-          </Paper>
-        </Box>
+          </Box>
+        </Collapse>
       </Box>
+
     </Box>
   );
 }
 
-const navBtn = { width: 40, height: 40, borderRadius: 3, border: "1px solid rgba(255,255,255,0.16)", backgroundColor: "rgba(255,255,255,0.10)", color: "white", "&:hover": { backgroundColor: "rgba(255,255,255,0.16)" } };
-const fieldStyle = (brand: any) => ({ "& .MuiOutlinedInput-root": { backgroundColor: "rgba(255,255,255,0.08)", color: "white", borderRadius: 3, "& fieldset": { borderColor: "rgba(255,255,255,0.2)" }, "&:hover fieldset": { borderColor: brand.aqua }, "&.Mui-focused fieldset": { borderColor: brand.aqua } }, "& label": { color: "rgba(255,255,255,0.70)" }, "& label.Mui-focused": { color: "white" } });
+const fieldStyle = (brand: any) => ({
+  "& .MuiOutlinedInput-root": { 
+    borderRadius: "50px", 
+    height: "44px",
+    backgroundColor: "#f7f7f7",
+    "& fieldset": { borderColor: "#eee" }, 
+    "&.Mui-focused fieldset": { borderColor: brand.primary } 
+  },
+  "& .MuiInputBase-input": { fontSize: "0.85rem", ml: 0.5, fontWeight: 600 }
+});
 
-function Social({ href, icon, label }: any) {
+function Social({ icon, color, link }: { icon: any, color: string, link: string }) {
   return (
-    <Tooltip title={label}>
-      <IconButton component="a" href={href} target="_blank" sx={{ width: 42, height: 42, color: "white", backgroundColor: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.14)", "&:hover": { backgroundColor: "rgba(255,255,255,0.22)" } }}>
-        {icon}
-      </IconButton>
-    </Tooltip>
+    <IconButton size="small" component="a" href={link} target="_blank" rel="noopener noreferrer" sx={{ color: color }}>
+      {icon}
+    </IconButton>
   );
 }

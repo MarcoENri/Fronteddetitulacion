@@ -28,7 +28,7 @@ import {
   BookOutlined,
 } from "@ant-design/icons";
 
-import logoImg from "../assets/imagenes/Logo.png";
+import logoImg from "../assets/imagenes/LogoTec-Photoroom.png";
 import AssignStudentModal from "../components/AssignStudentModal";
 
 const { Title, Text } = Typography;
