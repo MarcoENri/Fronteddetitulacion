@@ -13,11 +13,11 @@ export default defineConfig({
     proxy: {
       // SOLO endpoints de API del backend
       "/auth": {
-        target: "http://192.168.1.39:8081",
+        target: "http://26.146.215.130:8081",
         changeOrigin: true,
       },
       "/me": {
-        target: "http://192.168.1.39:8081",
+        target: "http://26.146.215.130:8081",
         changeOrigin: true,
       },
       // Si tu backend tiene otros endpoints, agrégalos aquí
