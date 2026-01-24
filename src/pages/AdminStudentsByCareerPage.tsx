@@ -9,11 +9,11 @@ import {
   Dropdown,
   Select,
   Tooltip,
-  Avatar, // Para mostrar la foto
+  Avatar,
 } from "antd";
 import type { MenuProps } from "antd";
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { listStudents } from "../services/adminStudentService";
 import type { AdminStudentRow } from "../services/adminStudentService";
 import { logout } from "../services/authService";
@@ -27,7 +27,7 @@ import {
   BookOutlined,
   InfoCircleOutlined,
   DownOutlined,
-  UserOutlined, // Icono por defecto
+  UserOutlined,
 } from "@ant-design/icons";
 
 import logoImg from "../assets/imagenes/LogoTec-Photoroom.png";
@@ -37,27 +37,9 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 const VERDE_INSTITUCIONAL = "#008B8B";
 
-// =================================================================
-// 1. CONFIGURACIÓN DE LA URL (Aquí es donde pones la ruta de tu API)
-// =================================================================
-const API_URL = "http://localhost:3000"; // Cambia esto por la URL real de tu servidor
+const API_URL = "http://localhost:8081";
 
 /* ===================== FUNCIONES DE FORMATO ===================== */
-
-function normalizeCareer(v?: string) {
-  const x = (v ?? "").trim().toLowerCase();
-  if (x.includes("desarrollo") && x.includes("software")) return "Desarrollo de software";
-  if (x.includes("dise") && x.includes("gr")) return "Diseño gráfico";
-  if (x.includes("gastr")) return "Gastronomía";
-  if (x.includes("marketing")) return "Marketing digital y negocios";
-  if (x.includes("turismo")) return "Turismo";
-  if (x.includes("talento")) return "Talento humano";
-  if (x.includes("enfer")) return "Enfermería";
-  if (x.includes("electr")) return "Electricidad";
-  if (x.includes("contab") || x.includes("tribut")) return "Contabilidad y asesoría tributaria";
-  if (x.includes("redes") || x.includes("telecom")) return "Redes y Telecomunicaciones";
-  return v?.trim() || "Sin carrera";
-}
 
 function sectionTag(section?: string) {
   const v = (section ?? "").toUpperCase();
@@ -78,9 +60,17 @@ function statusTag(status?: string) {
 /* ===================== COMPONENTE PRINCIPAL ===================== */
 
 export default function AdminStudentsByCareerPage() {
-  const { careerName } = useParams();
-  const career = decodeURIComponent(careerName ?? "");
   const nav = useNavigate();
+
+  // ✅ 2) Inicio del componente: Params y State
+  const [searchParams] = useSearchParams();
+  const careerId = Number(searchParams.get("careerId"));
+  const periodIdFromUrl = searchParams.get("periodId");
+  
+  // ✅ CAMBIO 1: Capturar el nombre de la carrera desde la URL como fallback
+  const careerNameFromUrl = searchParams.get("careerName");
+
+  const [careerTitle, setCareerTitle] = useState("Carrera");
 
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<AdminStudentRow[]>([]);
@@ -91,31 +81,77 @@ export default function AdminStudentsByCareerPage() {
   const [openAssign, setOpenAssign] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
 
-  const load = async () => {
+  // ✅ 3) Lógica de periodo: URL > localStorage
+  const getSelectedPeriodId = () => {
+    // 1) prioridad: periodId en la URL
+    if (periodIdFromUrl && Number.isFinite(Number(periodIdFromUrl))) return Number(periodIdFromUrl);
+
+    // 2) fallback: localStorage
+    const pidStr = localStorage.getItem("adminPeriodId");
+    if (!pidStr) return undefined;
+    const n = Number(pidStr);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
+  // ✅ 4) Load: Valida ID y calcula título
+  const load = useCallback(async () => {
+    if (!Number.isFinite(careerId) || careerId === 0) {
+      message.error("Falta careerId en la URL");
+      setRows([]);
+      return;
+    }
+
     setLoading(true);
     try {
-      const data = await listStudents();
-      setRows(data);
+      const pid = getSelectedPeriodId();
+      const data = await listStudents(pid);
+      const arr = Array.isArray(data) ? data : [];
+      setRows(arr);
+
+      // ✅ CAMBIO 1 (Continuación): Lógica robusta para el título
+      // Intenta buscar en la lista de estudiantes
+      const match = arr.find((r: any) => Number(r.careerId) === careerId);
+      
+      // Si hay match usa el de la API, sino usa el de la URL, sino "Carrera"
+      setCareerTitle(match?.career ?? careerNameFromUrl ?? "Carrera");
+
     } catch (e: any) {
       if (e?.response?.status === 401 || e?.response?.status === 403) {
-        handleLogout();
+        logout();
+        window.location.href = "/";
       } else {
         message.error(e?.response?.data?.message ?? "No se pudo cargar estudiantes");
       }
     } finally {
       setLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [careerId, periodIdFromUrl, careerNameFromUrl]); 
 
-  useEffect(() => { load(); }, []);
+  // Carga inicial
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const handleLogout = () => { logout(); window.location.href = "/"; };
+  // ✅ CAMBIO 2: Listener para recargar si cambia el periodo en otra pestaña
+  useEffect(() => {
+    const onStorage = (ev: StorageEvent) => {
+      if (ev.key === "adminPeriodId") {
+        console.log("Detectado cambio de periodo en localStorage, recargando...");
+        load();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [load]);
 
+
+  // ✅ 5) Filtro principal: SOLO por careerId
   const filtered = useMemo(() => {
-    let result = rows
-      .map((r) => ({ ...r, careerNorm: normalizeCareer(r.career) }))
-      .filter((r: any) => r.careerNorm === career);
+    // A) Filtro base: careerId
+    let result = rows.filter((r: any) => Number(r.careerId) === careerId);
 
+    // B) Filtros secundarios
     if (filterSection) {
       result = result.filter((r: any) => (r.section ?? "").toUpperCase().includes(filterSection));
     }
@@ -126,52 +162,55 @@ export default function AdminStudentsByCareerPage() {
 
     const s = q.trim().toLowerCase();
     if (s) {
-      result = result.filter((r: any) => 
-        String(r.dni).toLowerCase().includes(s) || 
-        `${r.firstName} ${r.lastName}`.toLowerCase().includes(s)
+      result = result.filter(
+        (r: any) =>
+          String(r.dni).toLowerCase().includes(s) ||
+          `${r.firstName} ${r.lastName}`.toLowerCase().includes(s)
       );
     }
     return result;
-  }, [rows, q, career, filterSection, filterStatus]);
+  }, [rows, careerId, q, filterSection, filterStatus]);
 
   const columns = [
-    // COLUMNA PARA VER LA FOTO AUTOMÁTICAMENTE
     {
       title: "FOTO",
-      dataIndex: "fotoUrl", // Asegúrate que tu DB devuelva este nombre
+      dataIndex: "fotoUrl",
       width: 70,
       render: (fotoUrl: string) => (
-        <Avatar 
-          src={fotoUrl ? `${API_URL}/uploads/${fotoUrl}` : null} 
-          icon={<UserOutlined />} 
-          style={{ backgroundColor: '#ccc' }}
+        <Avatar
+          src={fotoUrl ? `${API_URL}/uploads/${fotoUrl}` : undefined}
+          icon={<UserOutlined />}
+          style={{ backgroundColor: "#ccc" }}
         />
       ),
     },
     { title: "DNI/CÉDULA", dataIndex: "dni", width: 120, render: (v: string) => <Text strong>{v}</Text> },
-    { title: "Nombres", dataIndex: "firstName", minWidth: 150 },
-    { title: "Apellidos", dataIndex: "lastName", minWidth: 150 },
+    { title: "Nombres", dataIndex: "firstName", width: 160 },
+    { title: "Apellidos", dataIndex: "lastName", width: 160 },
     { title: "Sección", dataIndex: "section", width: 130, render: (v: string) => sectionTag(v) },
-    { title: "Estado", dataIndex: "status", width: 120, render: (v: string) => statusTag(v) },
+    { title: "Estado", dataIndex: "status", width: 130, render: (v: string) => statusTag(v) },
     {
       title: "Acción",
-      width: 150,
+      width: 160,
       render: (_: unknown, row: any) => (
         <Space size="middle">
           <Tooltip title="Mayor información">
-            <Button 
-              type="text" 
+            <Button
+              type="text"
               shape="circle"
-              icon={<InfoCircleOutlined style={{ fontSize: '18px', color: VERDE_INSTITUCIONAL }} />}
+              icon={<InfoCircleOutlined style={{ fontSize: "18px", color: VERDE_INSTITUCIONAL }} />}
               onClick={() => nav(`/admin/students/${row.id}`)}
             />
           </Tooltip>
-          <Button 
-            size="small" 
+          <Button
+            size="small"
             shape="round"
-            icon={<UserSwitchOutlined />} 
-            style={{ backgroundColor: "#0b7f7a", color: "white", border: 'none' }} 
-            onClick={() => { setSelectedStudentId(row.id); setOpenAssign(true); }}
+            icon={<UserSwitchOutlined />}
+            style={{ backgroundColor: "#0b7f7a", color: "white", border: "none" }}
+            onClick={() => {
+              setSelectedStudentId(row.id);
+              setOpenAssign(true);
+            }}
           >
             Asignar
           </Button>
@@ -180,111 +219,150 @@ export default function AdminStudentsByCareerPage() {
     },
   ];
 
-  const sessionItems: MenuProps['items'] = [
-    { key: 'null', label: 'TODOS', onClick: () => setFilterSection(null) },
-    { key: 'DIUR', label: 'DIURNA', onClick: () => setFilterSection('DIUR') },
-    { key: 'VESP', label: 'VESPERTINA', onClick: () => setFilterSection('VESP') },
-    { key: 'NOCT', label: 'NOCTURNA', onClick: () => setFilterSection('NOCT') },
+  const sessionItems: MenuProps["items"] = [
+    { key: "null", label: "TODOS", onClick: () => setFilterSection(null) },
+    { key: "DIUR", label: "DIURNA", onClick: () => setFilterSection("DIUR") },
+    { key: "VESP", label: "VESPERTINA", onClick: () => setFilterSection("VESP") },
+    { key: "NOCT", label: "NOCTURNA", onClick: () => setFilterSection("NOCT") },
   ];
 
-  const items: MenuProps['items'] = [
+  const items: MenuProps["items"] = [
     {
-      key: 'sga',
-      label: <a href="https://sudamericano.edu.ec/" target="_blank" rel="noopener noreferrer" style={{ color: VERDE_INSTITUCIONAL, fontWeight: '500' }}>Ir al SGA</a>,
+      key: "sga",
+      label: (
+        <a
+          href="https://sudamericano.edu.ec/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: VERDE_INSTITUCIONAL, fontWeight: "500" }}
+        >
+          Ir al SGA
+        </a>
+      ),
       icon: <GlobalOutlined style={{ color: VERDE_INSTITUCIONAL }} />,
     },
     {
-      key: 'eva',
-      label: <a href="https://eva.sudamericano.edu.ec/login/index.php" target="_blank" rel="noopener noreferrer" style={{ color: VERDE_INSTITUCIONAL, fontWeight: '500' }}>Ir al EVA</a>,
+      key: "eva",
+      label: (
+        <a
+          href="https://eva.sudamericano.edu.ec/login/index.php"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: VERDE_INSTITUCIONAL, fontWeight: "500" }}
+        >
+          Ir al EVA
+        </a>
+      ),
       icon: <BookOutlined style={{ color: VERDE_INSTITUCIONAL }} />,
     },
   ];
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#f0f2f5", overflow: "hidden" }}>
-      
       <style>{`
         .main-header { padding: 0 20px !important; }
         .header-title { font-size: 16px !important; }
-
-        .custom-table .ant-table-thead > tr > th { 
-          background-color: ${VERDE_INSTITUCIONAL} !important; 
-          color: white !important; 
-          text-align: center !important; 
+        .custom-table .ant-table-thead > tr > th {
+          background-color: ${VERDE_INSTITUCIONAL} !important;
+          color: white !important;
+          text-align: center !important;
           font-weight: 800 !important;
         }
-
         .ant-input-affix-wrapper {
           border-radius: 30px !important;
           padding-left: 15px !important;
         }
-
         .green-border-left {
           border-left: 5px solid ${VERDE_INSTITUCIONAL} !important;
         }
       `}</style>
 
       {/* HEADER */}
-      <div className="main-header" style={{ backgroundColor: VERDE_INSTITUCIONAL, height: "60px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2.5px solid #fff", flexShrink: 0 }}>
+      <div
+        className="main-header"
+        style={{
+          backgroundColor: VERDE_INSTITUCIONAL,
+          height: "60px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "2.5px solid #fff",
+          flexShrink: 0,
+        }}
+      >
         <Space size="middle">
-          <Dropdown menu={{ items }} trigger={['click']}>
-            <img src={logoImg} alt="TEC" style={{ height: "30px", cursor: 'pointer' }} />
+          <Dropdown menu={{ items }} trigger={["click"]}>
+            <img src={logoImg} alt="TEC" style={{ height: "30px", cursor: "pointer" }} />
           </Dropdown>
-          <Title level={4} style={{ margin: 0, color: "#fff", fontWeight: 700 }}>{career}</Title>
+          {/* Título dinámico */}
+          <Title level={4} style={{ margin: 0, color: "#fff", fontWeight: 700 }}>
+            {careerTitle}
+          </Title>
         </Space>
-        
+
         <Space size="small">
-          <Button icon={<ArrowLeftOutlined />} onClick={() => nav("/admin/students")} shape="round" style={{ fontWeight: 'bold', color: VERDE_INSTITUCIONAL }}>Atrás</Button>
-          <Button icon={<ReloadOutlined />} onClick={() => load()} loading={loading} shape="round" style={{ fontWeight: 'bold', color: VERDE_INSTITUCIONAL }}>Actualizar</Button>
-          <Button icon={<LogoutOutlined />} onClick={handleLogout} shape="round" style={{ fontWeight: 'bold', color: VERDE_INSTITUCIONAL }}>Salir</Button>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => nav("/admin/students")} shape="round" style={{ fontWeight: "bold", color: VERDE_INSTITUCIONAL }}>
+            Atrás
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={load} loading={loading} shape="round" style={{ fontWeight: "bold", color: VERDE_INSTITUCIONAL }}>
+            Actualizar
+          </Button>
+          <Button icon={<LogoutOutlined />} onClick={() => { logout(); window.location.href = "/"; }} shape="round" style={{ fontWeight: "bold", color: VERDE_INSTITUCIONAL }}>
+            Salir
+          </Button>
         </Space>
       </div>
 
       <div style={{ flex: 1, padding: "15px 10px", display: "flex", justifyContent: "center", overflow: "hidden" }}>
         <div style={{ width: "100%", maxWidth: "1300px", display: "flex", flexDirection: "column" }}>
-          
-          <div className="search-container green-border-left" style={{ backgroundColor: "#fff", padding: "15px 20px", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-            
+          <div
+            className="search-container green-border-left"
+            style={{
+              backgroundColor: "#fff",
+              padding: "15px 20px",
+              borderRadius: "12px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "15px",
+            }}
+          >
             <Space size="large">
-              <Input 
-                className="search-input" 
-                allowClear 
-                value={q} 
-                onChange={(e) => setQ(e.target.value)} 
-                prefix={<SearchOutlined style={{ color: VERDE_INSTITUCIONAL }} />} 
-                placeholder="Buscar por estudiante o cédula..." 
-                style={{ width: "350px" }} 
+              <Input
+                className="search-input"
+                allowClear
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                prefix={<SearchOutlined style={{ color: VERDE_INSTITUCIONAL }} />}
+                placeholder="Buscar por estudiante o cédula..."
+                style={{ width: "350px" }}
               />
 
-              <Select
-                placeholder="Filtrar por Estado"
-                style={{ width: 180 }}
-                allowClear
-                onChange={(val) => setFilterStatus(val)}
-              >
+              <Select placeholder="Filtrar por Estado" style={{ width: 180 }} allowClear onChange={(val) => setFilterStatus(val)}>
                 <Option value="EN_CURSO">EN CURSO</Option>
                 <Option value="APROB">APROBADO</Option>
                 <Option value="REPROB">REPROBADO</Option>
               </Select>
             </Space>
-            
-            <Dropdown menu={{ items: sessionItems }} trigger={['click']}>
+
+            <Dropdown menu={{ items: sessionItems }} trigger={["click"]}>
               <Button shape="round" icon={<DownOutlined />} style={{ borderColor: VERDE_INSTITUCIONAL, color: VERDE_INSTITUCIONAL, fontWeight: 700 }}>
                 {filterSection ? `SESIÓN: ${filterSection}` : "SESIONES"}
               </Button>
             </Dropdown>
           </div>
 
-          <div className="green-border-left" style={{ flex: 1, overflow: "hidden", backgroundColor: 'white', borderRadius: '12px', boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-            <Table<AdminStudentRow> 
-              className="custom-table" 
-              rowKey="id" 
-              loading={loading} 
-              dataSource={filtered as any} 
-              columns={columns as any} 
-              size="middle" 
-              scroll={{ x: 'max-content', y: 'calc(100vh - 310px)' }} 
-              pagination={{ pageSize: 10, showSizeChanger: false }} 
+          <div className="green-border-left" style={{ flex: 1, overflow: "hidden", backgroundColor: "white", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+            <Table<AdminStudentRow>
+              className="custom-table"
+              rowKey="id"
+              loading={loading}
+              dataSource={filtered as any}
+              columns={columns as any}
+              size="middle"
+              scroll={{ x: "max-content", y: "calc(100vh - 310px)" }}
+              pagination={{ pageSize: 10, showSizeChanger: false }}
             />
           </div>
         </div>
@@ -294,7 +372,12 @@ export default function AdminStudentsByCareerPage() {
         <Text style={{ color: "#fff", fontSize: "11px", fontWeight: 600 }}>© 2026 INSTITUTO SUPERIOR TECNOLÓGICO SUDAMERICANO</Text>
       </div>
 
-      <AssignStudentModal open={openAssign} studentId={selectedStudentId} onClose={() => setOpenAssign(false)} onSuccess={load} />
+      <AssignStudentModal
+        open={openAssign}
+        studentId={selectedStudentId}
+        onClose={() => setOpenAssign(false)}
+        onSuccess={load}
+      />
     </div>
   );
 }

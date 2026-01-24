@@ -11,15 +11,18 @@ import {
   message,
   Space,
   Tag,
-  Typography
+  Typography,
+  Popconfirm, // 1. Import nuevo
 } from "antd";
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { 
-  ArrowLeftOutlined, 
-  MailOutlined, 
-  FileSearchOutlined, 
-  PlusOutlined 
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  ArrowLeftOutlined,
+  MailOutlined,
+  FileSearchOutlined,
+  PlusOutlined,
+  EditOutlined,   // 1. Icono nuevo
+  DeleteOutlined, // 1. Icono nuevo
 } from "@ant-design/icons";
 
 import {
@@ -28,8 +31,12 @@ import {
   createTutorObservation,
 } from "../services/tutorService";
 
+// 1. Service nuevo
+import { deleteIncident } from "../services/incidentManageService";
 import type { StudentDetailDto } from "../services/tutorService";
 import SendEmailModal from "../components/SendEmailModal";
+// 1. Componente nuevo
+import EditIncidentModal from "../components/EditIncidentModal";
 
 const { Title, Text } = Typography;
 const VERDE_INSTITUCIONAL = "#008B8B";
@@ -37,6 +44,18 @@ const VERDE_INSTITUCIONAL = "#008B8B";
 export default function TutorStudentDetailPage() {
   const nav = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [sp] = useSearchParams();
+
+  // ✅ periodId: primero query ?periodId=, si no, localStorage
+  const periodId = useMemo(() => {
+    const q = sp.get("periodId");
+    if (q && !Number.isNaN(Number(q))) return Number(q);
+
+    const ls = localStorage.getItem("periodId");
+    if (ls && !Number.isNaN(Number(ls))) return Number(ls);
+
+    return null;
+  }, [sp]);
 
   const [data, setData] = useState<StudentDetailDto | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,14 +64,27 @@ export default function TutorStudentDetailPage() {
   const [obsOpen, setObsOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
 
+  // 2. Estados nuevos para edición/borrado
+  const [editIncOpen, setEditIncOpen] = useState(false);
+  const [editingIncident, setEditingIncident] = useState<any>(null);
+
   const load = async () => {
     if (!id) return;
+
+    if (!periodId) {
+      message.warning("Falta periodId. Regresando al listado...");
+      nav("/tutor", { replace: true });
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await getTutorStudentDetail(id);
+      const res = await getTutorStudentDetail(id, periodId);
       setData(res);
     } catch (e: any) {
-      message.error(e?.response?.data?.message ?? "No se pudo cargar el estudiante");
+      message.error(
+        e?.response?.data?.message ?? "No se pudo cargar el estudiante"
+      );
       nav("/tutor", { replace: true });
     } finally {
       setLoading(false);
@@ -61,34 +93,44 @@ export default function TutorStudentDetailPage() {
 
   useEffect(() => {
     load();
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, periodId]);
 
   if (!data) return null;
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f4f7f6" }}>
       {/* HEADER SIN CAMPANA */}
-      <div style={{ 
-        backgroundColor: VERDE_INSTITUCIONAL, 
-        padding: "0 24px", 
-        height: "64px", 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center",
-        borderBottom: "4px solid #fff"
-      }}>
+      <div
+        style={{
+          backgroundColor: VERDE_INSTITUCIONAL,
+          padding: "0 24px",
+          height: "64px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "4px solid #fff",
+        }}
+      >
         <Space>
-          <Button 
-            icon={<ArrowLeftOutlined />} 
+          <Button
+            icon={<ArrowLeftOutlined />}
             onClick={() => nav("/tutor")}
-            style={{ borderRadius: "20px", fontWeight: "bold", color: VERDE_INSTITUCIONAL }}
+            style={{
+              borderRadius: "20px",
+              fontWeight: "bold",
+              color: VERDE_INSTITUCIONAL,
+            }}
           >
             Volver
           </Button>
-          <Title level={4} style={{ margin: 0, color: "#fff" }}>Panel de Tutoría</Title>
+          <Title level={4} style={{ margin: 0, color: "#fff" }}>
+            Panel de Tutoría
+          </Title>
         </Space>
-        <Button 
-          icon={<MailOutlined />} 
+
+        <Button
+          icon={<MailOutlined />}
           onClick={() => setEmailOpen(true)}
           style={{ borderRadius: "20px", fontWeight: "bold" }}
         >
@@ -97,39 +139,104 @@ export default function TutorStudentDetailPage() {
       </div>
 
       <div style={{ padding: "24px", maxWidth: "1100px", margin: "0 auto" }}>
-        
-        <Card 
+        <Card
           loading={loading}
-          style={{ borderRadius: "16px", overflow: "hidden", border: "none", boxShadow: "0 8px 20px rgba(0,0,0,0.08)" }}
+          style={{
+            borderRadius: "16px",
+            overflow: "hidden",
+            border: "none",
+            boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+          }}
           bodyStyle={{ padding: 0 }}
         >
           {/* BANNER DE IDENTIDAD */}
-          <div style={{ backgroundColor: VERDE_INSTITUCIONAL, padding: "20px 24px" }}>
+          <div
+            style={{
+              backgroundColor: VERDE_INSTITUCIONAL,
+              padding: "20px 24px",
+            }}
+          >
             <Space align="start" size="middle">
-              <FileSearchOutlined style={{ fontSize: "28px", color: "#fff", marginTop: "4px" }} />
+              <FileSearchOutlined
+                style={{
+                  fontSize: "28px",
+                  color: "#fff",
+                  marginTop: "4px",
+                }}
+              />
               <div>
-                <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: "bold", textTransform: "uppercase" }}>Seguimiento Académico</Text>
-                <Title level={3} style={{ margin: 0, color: "#fff" }}>{data.firstName} {data.lastName}</Title>
+                <Text
+                  style={{
+                    color: "rgba(255,255,255,0.8)",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Seguimiento Académico
+                </Text>
+                <Title level={3} style={{ margin: 0, color: "#fff" }}>
+                  {data.firstName} {data.lastName}
+                </Title>
               </div>
             </Space>
           </div>
 
           <div style={{ padding: "24px" }}>
             <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label={<Text strong style={{ color: VERDE_INSTITUCIONAL }}>Estudiante</Text>}>
+              <Descriptions.Item
+                label={
+                  <Text strong style={{ color: VERDE_INSTITUCIONAL }}>
+                    Estudiante
+                  </Text>
+                }
+              >
                 {data.firstName} {data.lastName}
               </Descriptions.Item>
-              <Descriptions.Item label={<Text strong style={{ color: VERDE_INSTITUCIONAL }}>Email</Text>}>
+
+              <Descriptions.Item
+                label={
+                  <Text strong style={{ color: VERDE_INSTITUCIONAL }}>
+                    Email
+                  </Text>
+                }
+              >
                 {data.email}
               </Descriptions.Item>
-              <Descriptions.Item label={<Text strong style={{ color: VERDE_INSTITUCIONAL }}>Carrera</Text>}>
+
+              <Descriptions.Item
+                label={
+                  <Text strong style={{ color: VERDE_INSTITUCIONAL }}>
+                    Carrera
+                  </Text>
+                }
+              >
                 {data.career}
               </Descriptions.Item>
-              <Descriptions.Item label={<Text strong style={{ color: VERDE_INSTITUCIONAL }}>Estado</Text>}>
+
+              <Descriptions.Item
+                label={
+                  <Text strong style={{ color: VERDE_INSTITUCIONAL }}>
+                    Estado
+                  </Text>
+                }
+              >
                 <Tag color="blue">{data.status}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label={<Text strong style={{ color: VERDE_INSTITUCIONAL }}>Proyecto</Text>} span={2}>
-                {data.thesisProject ?? <Text type="secondary" italic>No definido</Text>}
+
+              <Descriptions.Item
+                label={
+                  <Text strong style={{ color: VERDE_INSTITUCIONAL }}>
+                    Proyecto
+                  </Text>
+                }
+                span={2}
+              >
+                {data.thesisProject ?? (
+                  <Text type="secondary" italic>
+                    No definido
+                  </Text>
+                )}
               </Descriptions.Item>
             </Descriptions>
 
@@ -141,7 +248,15 @@ export default function TutorStudentDetailPage() {
                   key: "inc",
                   label: `Incidencias (${data.incidentCount})`,
                   children: (
-                    <div style={{ padding: "16px", backgroundColor: "#fff", borderRadius: "0 0 8px 8px", border: "1px solid #f0f0f0", borderTop: "none" }}>
+                    <div
+                      style={{
+                        padding: "16px",
+                        backgroundColor: "#fff",
+                        borderRadius: "0 0 8px 8px",
+                        border: "1px solid #f0f0f0",
+                        borderTop: "none",
+                      }}
+                    >
                       <Button
                         type="primary"
                         danger
@@ -153,6 +268,7 @@ export default function TutorStudentDetailPage() {
                         Nueva incidencia
                       </Button>
 
+                      {/* 3. Tabla actualizada con columna Acciones */}
                       <Table
                         size="small"
                         rowKey="id"
@@ -163,6 +279,39 @@ export default function TutorStudentDetailPage() {
                           { title: "Fecha", dataIndex: "date" },
                           { title: "Motivo", dataIndex: "reason" },
                           { title: "Acción", dataIndex: "action" },
+                          {
+                            title: "Acciones",
+                            width: 120,
+                            render: (_: any, inc: any) => (
+                              <Space>
+                                <Button
+                                  size="small"
+                                  icon={<EditOutlined />}
+                                  onClick={() => {
+                                    setEditingIncident(inc);
+                                    setEditIncOpen(true);
+                                  }}
+                                />
+                                <Popconfirm
+                                  title="¿Eliminar incidencia?"
+                                  okText="Eliminar"
+                                  cancelText="Cancelar"
+                                  onConfirm={async () => {
+                                    if (!periodId || !data?.id) return;
+                                    try {
+                                      const res = await deleteIncident(data.id, inc.id, periodId);
+                                      message.success(`Eliminada ✅ (Estado: ${res?.studentStatus ?? "OK"})`);
+                                      load();
+                                    } catch (e: any) {
+                                      message.error(e?.response?.data?.message ?? "No se pudo eliminar");
+                                    }
+                                  }}
+                                >
+                                  <Button size="small" danger icon={<DeleteOutlined />} />
+                                </Popconfirm>
+                              </Space>
+                            ),
+                          },
                         ]}
                       />
                     </div>
@@ -172,11 +321,24 @@ export default function TutorStudentDetailPage() {
                   key: "obs",
                   label: `Observaciones (${data.observationCount})`,
                   children: (
-                    <div style={{ padding: "16px", backgroundColor: "#fff", borderRadius: "0 0 8px 8px", border: "1px solid #f0f0f0", borderTop: "none" }}>
-                      <Button 
+                    <div
+                      style={{
+                        padding: "16px",
+                        backgroundColor: "#fff",
+                        borderRadius: "0 0 8px 8px",
+                        border: "1px solid #f0f0f0",
+                        borderTop: "none",
+                      }}
+                    >
+                      <Button
                         icon={<PlusOutlined />}
                         onClick={() => setObsOpen(true)}
-                        style={{ marginBottom: 16, borderRadius: "6px", borderColor: VERDE_INSTITUCIONAL, color: VERDE_INSTITUCIONAL }}
+                        style={{
+                          marginBottom: 16,
+                          borderRadius: "6px",
+                          borderColor: VERDE_INSTITUCIONAL,
+                          color: VERDE_INSTITUCIONAL,
+                        }}
                       >
                         Nueva observación
                       </Button>
@@ -201,7 +363,7 @@ export default function TutorStudentDetailPage() {
         </Card>
       </div>
 
-      {/* MODALES CON LÓGICA ORIGINAL */}
+      {/* MODALES */}
       <SendEmailModal
         open={emailOpen}
         studentId={data.id}
@@ -219,8 +381,9 @@ export default function TutorStudentDetailPage() {
         <Form
           layout="vertical"
           onFinish={async (v) => {
+            if (!id || !periodId) return;
             try {
-              await createTutorIncident(id!, {
+              await createTutorIncident(id, periodId, {
                 stage: v.stage,
                 date: v.date.format("YYYY-MM-DD"),
                 reason: v.reason,
@@ -230,18 +393,33 @@ export default function TutorStudentDetailPage() {
               setIncidentOpen(false);
               load();
             } catch (e: any) {
-              message.error(e?.response?.data?.message ?? "No se pudo registrar incidencia");
+              message.error(
+                e?.response?.data?.message ?? "No se pudo registrar incidencia"
+              );
             }
           }}
         >
-          <Form.Item name="stage" label="Etapa" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="date" label="Fecha" rules={[{ required: true }]}><DatePicker style={{ width: "100%" }} /></Form.Item>
-          <Form.Item name="reason" label="Motivo" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
-          <Form.Item name="action" label="Acción" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item name="stage" label="Etapa" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="date" label="Fecha" rules={[{ required: true }]}>
+            <DatePicker style={{ width: "100%" }} />
+          </Form.Item>
+
+          <Form.Item name="reason" label="Motivo" rules={[{ required: true }]}>
+            <Input.TextArea rows={3} />
+          </Form.Item>
+
+          <Form.Item name="action" label="Acción" rules={[{ required: true }]}>
+            <Input.TextArea rows={3} />
+          </Form.Item>
 
           <Space style={{ width: "100%", justifyContent: "flex-end" }}>
             <Button onClick={() => setIncidentOpen(false)}>Cancelar</Button>
-            <Button htmlType="submit" type="primary" danger>Guardar</Button>
+            <Button htmlType="submit" type="primary" danger>
+              Guardar
+            </Button>
           </Space>
         </Form>
       </Modal>
@@ -256,24 +434,45 @@ export default function TutorStudentDetailPage() {
         <Form
           layout="vertical"
           onFinish={async (v) => {
+            if (!id || !periodId) return;
             try {
-              await createTutorObservation(id!, { text: v.text });
+              await createTutorObservation(id, periodId, { text: v.text });
               message.success("Observación registrada");
               setObsOpen(false);
               load();
             } catch (e: any) {
-              message.error(e?.response?.data?.message ?? "No se pudo registrar observación");
+              message.error(
+                e?.response?.data?.message ?? "No se pudo registrar observación"
+              );
             }
           }}
         >
-          <Form.Item name="text" label="Observación" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item>
+          <Form.Item name="text" label="Observación" rules={[{ required: true }]}>
+            <Input.TextArea rows={4} />
+          </Form.Item>
 
           <Space style={{ width: "100%", justifyContent: "flex-end" }}>
             <Button onClick={() => setObsOpen(false)}>Cancelar</Button>
-            <Button htmlType="submit" type="primary" style={{ backgroundColor: VERDE_INSTITUCIONAL }}>Guardar</Button>
+            <Button
+              htmlType="submit"
+              type="primary"
+              style={{ backgroundColor: VERDE_INSTITUCIONAL }}
+            >
+              Guardar
+            </Button>
           </Space>
         </Form>
       </Modal>
+
+      {/* 4. MODAL EDITAR INCIDENCIA (Agregado al final) */}
+      <EditIncidentModal
+        open={editIncOpen}
+        onClose={() => setEditIncOpen(false)}
+        onSaved={load}
+        periodId={periodId!}
+        studentId={data.id}
+        incident={editingIncident}
+      />
     </div>
   );
 }

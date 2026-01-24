@@ -1,3 +1,4 @@
+// src/services/coordinatorLookupService.ts
 import { api } from "../api/api";
 
 export type UserOption = {
@@ -7,14 +8,25 @@ export type UserOption = {
   email: string;
 };
 
-export async function listTutorsForCoordinator(): Promise<UserOption[]> {
-  const res = await api.get<any[]>("/coordinator/tutors");
+export type CareerOption = {
+  id: number;
+  name: string;
+};
 
-  // la respuesta viene como UserResponse[], pero aquí lo convertimos a UserOption
+export async function listTutorsForCoordinator(periodId: number): Promise<UserOption[]> {
+  const res = await api.get<any[]>("/coordinator/tutors", {
+    params: { periodId },
+  });
+
   return (res.data ?? []).map((u) => ({
-    id: u.id,
-    fullName: u.fullName,
-    username: u.username,
-    email: u.email,
+    id: Number(u.id),
+    fullName: String(u.fullName ?? ""),
+    username: String(u.username ?? ""),
+    email: String(u.email ?? ""),
   }));
+}
+
+export async function listCareers(): Promise<CareerOption[]> {
+  const res = await api.get<CareerOption[]>("/careers");
+  return res.data ?? [];
 }

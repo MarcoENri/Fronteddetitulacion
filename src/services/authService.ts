@@ -4,15 +4,22 @@ type LoginResponse = { token: string };
 
 export async function login(username: string, password: string) {
   const res = await api.post<LoginResponse>("/auth/login", { username, password });
-
-  // Cambiado a localStorage para que la sesión sobreviva al cerrar el navegador
-  localStorage.setItem("token", res.data.token); 
-
+  localStorage.setItem("token", res.data.token);
   return res.data;
 }
 
 export function logout() {
-  // Ahora sí borra el token correcto que usamos en toda la app
   localStorage.removeItem("token");
-  localStorage.clear(); 
+  // NO uses localStorage.clear() porque te borra adminPeriodId, loginOpen, etc.
+}
+
+/** ✅ Forgot password: backend devuelve { message, token } (para pruebas) */
+export async function forgotPassword(email: string): Promise<{ message: string; token: string }> {
+  const res = await api.post("/auth/forgot-password", { email });
+  return res.data;
+}
+
+/** ✅ Reset password */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  await api.post("/auth/reset-password", { token, newPassword });
 }

@@ -13,7 +13,7 @@ type FormValues = {
   password: string;
   fullName: string;
   email: string;
-  roles: Array<"ADMIN" | "COORDINATOR" | "TUTOR">;
+  roles: Array<"ADMIN" | "COORDINATOR" | "TUTOR" | "JURY">;
   enabled?: boolean;
 };
 
@@ -31,7 +31,6 @@ export default function CreateUserModal({ open, onClose, onSuccess }: Props) {
         password: v.password,
         fullName: v.fullName.trim(),
         email: v.email.trim(),
-        // ✅ Backend espera: ["ADMIN","COORDINATOR","TUTOR"] (sin ROLE_)
         roles: v.roles,
       });
 
@@ -40,7 +39,7 @@ export default function CreateUserModal({ open, onClose, onSuccess }: Props) {
       form.resetFields();
       onClose();
     } catch (e: any) {
-      if (e?.errorFields) return; // validación antd
+      if (e?.errorFields) return;
       message.error(e?.response?.data?.message ?? "No se pudo crear el usuario");
     } finally {
       setLoading(false);
@@ -69,7 +68,7 @@ export default function CreateUserModal({ open, onClose, onSuccess }: Props) {
             { min: 3, message: "Mínimo 3 caracteres" },
           ]}
         >
-          <Input placeholder="Ej: coordinator_sis" />
+          <Input placeholder="Ej: jurado_01" />
         </Form.Item>
 
         <Form.Item
@@ -111,12 +110,11 @@ export default function CreateUserModal({ open, onClose, onSuccess }: Props) {
               { value: "ADMIN", label: "ADMIN" },
               { value: "COORDINATOR", label: "COORDINATOR" },
               { value: "TUTOR", label: "TUTOR" },
+              { value: "JURY", label: "JURY" },
             ]}
           />
         </Form.Item>
 
-        {/* Nota: tu backend actualmente no recibe enabled en CreateUserRequest,
-            esto es solo visual. Si quieres manejar enabled, hay que agregarlo al backend. */}
         <Form.Item
           label="Activo (solo visual por ahora)"
           name="enabled"

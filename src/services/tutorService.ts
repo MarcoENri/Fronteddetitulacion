@@ -77,20 +77,39 @@ export type CreateObservationRequest = {
   text: string;
 };
 
-export async function listTutorStudents(): Promise<TutorStudentRow[]> {
-  const res = await api.get<TutorStudentRow[]>("/tutor/students");
+export async function listTutorStudents(periodId: number): Promise<TutorStudentRow[]> {
+  const res = await api.get<TutorStudentRow[]>("/tutor/students", {
+    params: { periodId },
+  });
   return res.data;
 }
 
-export async function getTutorStudentDetail(id: number | string): Promise<StudentDetailDto> {
-  const res = await api.get<StudentDetailDto>(`/tutor/students/${id}`);
+export async function getTutorStudentDetail(
+  id: number | string,
+  periodId: number
+): Promise<StudentDetailDto> {
+  const res = await api.get<StudentDetailDto>(`/tutor/students/${id}`, {
+    params: { periodId },
+  });
   return res.data;
 }
 
-export async function createTutorIncident(studentId: number | string, body: CreateIncidentRequest) {
-  await api.post(`/tutor/students/${studentId}/incidents`, body);
+export async function createTutorIncident(
+  studentId: number | string,
+  periodId: number,
+  body: CreateIncidentRequest
+) {
+  await api.post(`/tutor/students/${studentId}/incidents`, body, {
+    params: { periodId },
+  });
 }
 
-export async function createTutorObservation(studentId: number | string, body: CreateObservationRequest) {
-  await api.post(`/tutor/students/${studentId}/observations`, body);
+export async function createTutorObservation(
+  studentId: number | string,
+  periodId: number,
+  body: CreateObservationRequest
+) {
+  await api.post(`/tutor/students/${studentId}/observations`, body, {
+    params: { periodId },
+  });
 }

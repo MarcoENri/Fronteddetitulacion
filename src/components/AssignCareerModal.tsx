@@ -1,11 +1,14 @@
+// src/components/AssignCareerModal.tsx
 import { Modal, Form, Select, Input, Switch, message } from "antd";
-import { useEffect, useState } from "react";
-import type { UserOption } from "../services/adminLookupService";
-import { listUsersByRole } from "../services/adminLookupService";
-import { assignCareer } from "../services/adminAssignService";
-import { assignCareersToUser } from "../services/adminCareersToUserService";
+import { useEffect, useMemo, useState } from "react";
 
-// Definimos el tipo para que coincida con el del padre
+import type { UserOption, CareerOption } from "../services/adminLookupService";
+import { listUsersByRole, listCareers } from "../services/adminLookupService";
+
+import { assignByCareer } from "../services/adminAssignService"; // ✅ CAMBIO: antes assignCareer
+
+import { useActivePeriod } from "../hooks/useActivePeriod";
+
 type CareerItem = {
   key: string;
   label: string;
@@ -16,60 +19,87 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  // ✅ Recibimos las carreras actuales de las tarjetas
-  availableCareers: CareerItem[]; 
+  availableCareers: CareerItem[]; // solo para “bonito”, NO para enviar al backend
 };
 
 type FormValues = {
-  careerId: string; // Usamos string porque es la 'key' (ej: "Desarrollo de software")
+  careerId: number; // ✅ ID real (Long)
   coordinatorId: number;
   tutorId?: number;
   projectName?: string;
   onlyUnassigned: boolean;
 };
 
-export default function AssignCareerModal({ open, onClose, onSuccess, availableCareers }: Props) {
+export default function AssignCareerModal({
+  open,
+  onClose,
+  onSuccess,
+  availableCareers,
+}: Props) {
   const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(false);
 
   const [coordinators, setCoordinators] = useState<UserOption[]>([]);
   const [tutors, setTutors] = useState<UserOption[]>([]);
+  const [careers, setCareers] = useState<CareerOption[]>([]);
+
+  const activePeriod = useActivePeriod();
+
+  // prioridad “bonita” para que carreras de tus tarjetas aparezcan primero
+  const careerPriority = useMemo(() => {
+    return new Set((availableCareers ?? []).map((c) => c.key.toLowerCase().trim()));
+  }, [availableCareers]);
 
   useEffect(() => {
     if (!open) return;
 
     (async () => {
       try {
-        // ✅ Mantenemos tu lógica de cargar Coordinadores y Tutores del servidor
-        const [coords, tuts] = await Promise.all([
+        const [coords, tuts, cars] = await Promise.all([
           listUsersByRole("COORDINATOR"),
           listUsersByRole("TUTOR"),
+          listCareers(),
         ]);
+
         setCoordinators(coords);
         setTutors(tuts);
-        
+
+        const sorted = [...cars].sort((a, b) => {
+          const aKey = a.name.toLowerCase().trim();
+          const bKey = b.name.toLowerCase().trim();
+          const aP = careerPriority.has(aKey) ? 0 : 1;
+          const bP = careerPriority.has(bKey) ? 0 : 1;
+          if (aP !== bP) return aP - bP;
+          return a.name.localeCompare(b.name);
+        });
+
+        setCareers(sorted);
+
         form.setFieldsValue({ onlyUnassigned: true });
       } catch (e: any) {
         message.error(e?.response?.data?.message ?? "No se pudo cargar datos");
       }
     })();
-  }, [open, form]);
+  }, [open, form, careerPriority]);
 
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
 
-      // ✅ Paso 1: asegurar user_career para evitar error de backend
-      // Se envía el nombre/key de la carrera como identificador
-      await assignCareersToUser(values.coordinatorId, [values.careerId as any]);
+      // ✅ periodo activo obligatorio (para asignar por periodo)
+      if (!activePeriod.periodId) {
+        message.error(activePeriod.error ?? "No hay periodo activo. Activa uno primero.");
+        return;
+      }
 
-      // ✅ Paso 2: asignación masiva real
-      await assignCareer(values.careerId as any, {
+      await assignByCareer({
+        careerId: values.careerId, // ✅ number
         coordinatorId: values.coordinatorId,
         tutorId: values.tutorId ?? null,
         projectName: values.projectName?.trim() ? values.projectName.trim() : null,
         onlyUnassigned: values.onlyUnassigned,
+        academicPeriodId: activePeriod.periodId, // ✅ clave
       });
 
       message.success("Asignación masiva aplicada ✅");
@@ -96,7 +126,7 @@ export default function AssignCareerModal({ open, onClose, onSuccess, availableC
       }}
       destroyOnClose
       okText="OK"
-      cancelText="Cancel"
+      cancelText="Cancelar"
     >
       <Form layout="vertical" form={form}>
         <Form.Item
@@ -107,10 +137,9 @@ export default function AssignCareerModal({ open, onClose, onSuccess, availableC
           <Select
             showSearch
             optionFilterProp="label"
-            // ✅ Ahora las opciones vienen de las tarjetas (fijas + nuevas)
-            options={availableCareers.map((c) => ({ 
-              value: c.key, 
-              label: c.label 
+            options={careers.map((c) => ({
+              value: c.id,   // ✅ ID real
+              label: c.name, // 👁️ texto
             }))}
             placeholder="Selecciona carrera"
           />
@@ -156,6 +185,11 @@ export default function AssignCareerModal({ open, onClose, onSuccess, availableC
         >
           <Switch />
         </Form.Item>
+
+        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+          <b>Periodo activo:</b>{" "}
+          {activePeriod.loading ? "Cargando..." : activePeriod.periodName ?? "NO ACTIVO"}
+        </div>
       </Form>
     </Modal>
   );

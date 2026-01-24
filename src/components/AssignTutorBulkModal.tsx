@@ -2,10 +2,10 @@ import { Modal, Form, InputNumber, Input, message } from "antd";
 import { useState } from "react";
 import { assignProject } from "../services/coordinatorStudentService";
 
-
 type Props = {
   open: boolean;
   studentIds: number[];
+  periodId: number; // 👈 1. Agregamos esto para recibir el periodo actual
   onClose: () => void;
   onSuccess: () => void;
 };
@@ -15,7 +15,8 @@ type FormValues = {
   projectName: string;
 };
 
-export default function AssignTutorBulkModal({ open, studentIds, onClose, onSuccess }: Props) {
+// 👇 2. Desestructuramos periodId de las props
+export default function AssignTutorBulkModal({ open, studentIds, periodId, onClose, onSuccess }: Props) {
   const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(false);
 
@@ -26,7 +27,12 @@ export default function AssignTutorBulkModal({ open, studentIds, onClose, onSucc
 
       await Promise.all(
         studentIds.map((id) =>
-          assignProject(id, { tutorId: v.tutorId, projectName: v.projectName.trim() })
+          // 👇 3. Pasamos periodId como SEGUNDO argumento
+          assignProject(
+            id, 
+            periodId, 
+            { tutorId: v.tutorId, projectName: v.projectName.trim() }
+          )
         )
       );
 

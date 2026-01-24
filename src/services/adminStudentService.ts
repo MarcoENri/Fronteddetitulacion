@@ -19,51 +19,34 @@ export type AdminStudentRow = {
   corte: string;
   section: string;
   modality?: string | null;
-  career: string;
+
+  career: string;      // ya lo tenías
+  careerId?: number | null; // ✅ NUEVO (viene del backend)
+
   titulationType: string;
   status: string;
   incidentCount: number;
   observationCount: number;
+  academicPeriodName: string;
 };
 
-export type IncidentDto = {
-  id: number;
-  stage: string;
-  date: string;
-  reason: string;
-  action: string;
-  createdAt: string;
-};
 
-export type ObservationDto = {
-  id: number;
-  author: string;
-  text: string;
-  createdAt: string;
-};
+export async function importStudentsXlsx(file: File, academicPeriodId: number) {
+  const fd = new FormData();
+  fd.append("file", file);
 
-// Definimos el detalle completo
-export type StudentDetailDto = AdminStudentRow & {
-  incidents: IncidentDto[];
-  observations: ObservationDto[];
-};
-
-export async function importStudentsXlsx(file: File) {
-  const form = new FormData();
-  form.append("file", file);
-  const { data } = await api.post<ImportBatchResponse>("/admin/students/import/xlsx", form, {
+  const res = await api.post("/admin/students/import/xlsx", fd, {
+    params: { academicPeriodId }, // ✅ coincide con tu controller de import
     headers: { "Content-Type": "multipart/form-data" },
   });
-  return data;
+
+  return res.data as ImportBatchResponse;
 }
 
-export async function listStudents() {
-  const { data } = await api.get<AdminStudentRow[]>("/admin/students");
-  return data;
-}
-
-// Esta función es la que llama tu página de detalle
-export async function getStudentDetail(id: string | number) {
-  const { data } = await api.get<StudentDetailDto>(`/admin/students/${id}`);
-  return data;
+// ✅ LISTA POR PERIODO (usa academicPeriodId)
+export async function listStudents(academicPeriodId?: number) {
+  const { data } = await api.get<AdminStudentRow[]>("/admin/students", {
+    params: academicPeriodId ? { academicPeriodId } : undefined,
+  });
+  return Array.isArray(data) ? data : [];
 }

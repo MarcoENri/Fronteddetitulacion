@@ -17,25 +17,20 @@ import {
 
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
-import GroupRemoveRoundedIcon from "@mui/icons-material/GroupRemoveRounded";
-import AssignmentIndRoundedIcon from "@mui/icons-material/AssignmentIndRounded";
 import DeleteSweepRoundedIcon from "@mui/icons-material/DeleteSweepRounded";
 
-import type { CareerItem } from "../../src/pages/AdminStudentsPage";
+import type { CareerCardDto } from "../services/adminCareerCardsService";
 import type { AdminStudentRow } from "../services/adminStudentService";
 
 type Props = {
   verde: string;
 
-  careersVisible: CareerItem[];
-  groupedStudents: Record<string, AdminStudentRow[]>;
-  statsByCareer: Record<string, { total: number; withdrawn: number; incidents: number }>;
+  careerCards: CareerCardDto[];
+  groupedStudents: Record<number, AdminStudentRow[]>;
 
   searchTerm: string;
   setSearchTerm: (v: string) => void;
 
-  normalizeCareer: (v?: string) => string;
   getStudentName: (s: any) => string;
   getSemaforo: (s: any) => { bg: string; border: string; chipBg: string; chipText: string; label: string };
 
@@ -45,12 +40,10 @@ type Props = {
 
 export default function GeneralListSection({
   verde,
-  careersVisible,
+  careerCards,
   groupedStudents,
-  statsByCareer,
   searchTerm,
   setSearchTerm,
-  normalizeCareer,
   getStudentName,
   getSemaforo,
   onViewProfile,
@@ -58,7 +51,6 @@ export default function GeneralListSection({
 }: Props) {
   return (
     <>
-      {/* HEADER LISTA GENERAL + BUSCADOR (compacto) */}
       <Box sx={{ width: "100%", maxWidth: "1100px", mb: 2 }}>
         <Card
           sx={{
@@ -80,7 +72,7 @@ export default function GeneralListSection({
 
             {searchTerm.trim() && (
               <Typography sx={{ fontSize: "0.75rem", color: "#777", fontWeight: 500, mt: 0.4 }}>
-                {careersVisible.map((c) => c.label).join(" · ")}
+                Resultados filtrados por búsqueda
               </Typography>
             )}
           </Box>
@@ -97,85 +89,39 @@ export default function GeneralListSection({
                   <SearchRoundedIcon sx={{ color: verde }} />
                 </InputAdornment>
               ),
-              sx: {
-                borderRadius: "999px",
-                bgcolor: "#fff",
-                height: 34,
-                fontSize: "0.85rem",
-              },
+              sx: { borderRadius: "999px", bgcolor: "#fff", height: 34, fontSize: "0.85rem" },
             }}
           />
         </Card>
       </Box>
 
-      {/* LISTADO GENERAL */}
       <Box sx={{ width: "100%", maxWidth: "1100px" }}>
-        {careersVisible.map((career) => {
-          const students = groupedStudents[career.key] || [];
+        {careerCards.map((career) => {
+          const students = groupedStudents[career.id] || [];
           if (searchTerm.trim() && students.length === 0) return null;
-
-          const stats = statsByCareer[career.key] || { total: 0, withdrawn: 0, incidents: 0 };
-          const alertColor =
-            stats.incidents >= 3 ? "#d32f2f" : stats.incidents === 2 ? "#ff8c00" : stats.incidents === 1 ? "#fbc02d" : "#2e7d32";
 
           return (
             <Accordion
-              key={career.key}
+              key={career.id}
               sx={{
                 mb: 2,
                 borderRadius: "15px !important",
-                borderLeft: `8px solid ${career.color}`,
+                borderLeft: `8px solid ${career.color ?? "#90a4ae"}`,
                 boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
               }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between", pr: 2 }}>
-                  <Typography sx={{ fontWeight: 600, width: "25%", fontSize: "0.9rem" }}>{career.label}</Typography>
+                  <Typography sx={{ fontWeight: 700, fontSize: "0.95rem" }}>
+                    {career.name}
+                  </Typography>
 
-                  <Box sx={{ display: "flex", gap: 3, width: "40%", justifyContent: "center" }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <AssignmentIndRoundedIcon sx={{ fontSize: "1.1rem", color: "#666" }} />
-                      <Typography sx={{ fontWeight: 600, fontSize: "0.8rem" }}>
-                        {stats.total}{" "}
-                        <Box component="span" sx={{ fontWeight: 400, color: "#888" }}>
-                          Matriculados
-                        </Box>
-                      </Typography>
+                  <Typography sx={{ fontWeight: 700, color: career.color ?? verde }}>
+                    {students.length}{" "}
+                    <Box component="span" sx={{ fontWeight: 500, color: "#777" }}>
+                      estudiantes
                     </Box>
-
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <GroupRemoveRoundedIcon sx={{ fontSize: "1.1rem", color: "#d32f2f" }} />
-                      <Typography sx={{ fontWeight: 600, fontSize: "0.8rem", color: "#d32f2f" }}>
-                        {stats.withdrawn}{" "}
-                        <Box component="span" sx={{ fontWeight: 400, opacity: 0.7 }}>
-                          Retirados
-                        </Box>
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Box
-                      sx={{
-                        bgcolor: `${alertColor}15`,
-                        color: alertColor,
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: "20px",
-                        border: `1.5px solid ${alertColor}`,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 0.5,
-                      }}
-                    >
-                      <ErrorOutlineRoundedIcon sx={{ fontSize: "1rem" }} />
-                      <Typography sx={{ fontWeight: 700, fontSize: "0.7rem" }}>{stats.incidents} CON INCIDENCIAS</Typography>
-                    </Box>
-
-                    <Button variant="contained" size="small" sx={{ bgcolor: career.color, fontWeight: 700, textTransform: "none", borderRadius: "8px" }}>
-                      Notificar
-                    </Button>
-                  </Box>
+                  </Typography>
                 </Box>
               </AccordionSummary>
 
@@ -184,17 +130,11 @@ export default function GeneralListSection({
                   {students.length > 0 ? (
                     students.map((s: any, idx) => {
                       const sem = getSemaforo(s);
+                      const dni = s.dni ?? s.cedula ?? "-";
 
                       return (
                         <Box key={s.id || idx}>
-                          <ListItem
-                            sx={{
-                              py: 1.5,
-                              px: 4,
-                              bgcolor: sem.bg,
-                              borderLeft: `6px solid ${sem.border}`,
-                            }}
-                          >
+                          <ListItem sx={{ py: 1.5, px: 4, bgcolor: sem.bg, borderLeft: `6px solid ${sem.border}` }}>
                             <ListItemText
                               primary={
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
@@ -215,7 +155,7 @@ export default function GeneralListSection({
                               }
                               secondary={
                                 <Typography sx={{ fontSize: "0.8rem", color: "#666", fontWeight: 600 }}>
-                                  DNI: {s.dni ?? s.cedula ?? "-"} · Carrera: {normalizeCareer(s.career)}
+                                  DNI: {dni}
                                 </Typography>
                               }
                             />
@@ -225,7 +165,12 @@ export default function GeneralListSection({
                                 size="small"
                                 variant="outlined"
                                 onClick={() => onViewProfile(s.id)}
-                                sx={{ borderRadius: "20px", color: career.color, borderColor: career.color, fontWeight: 700 }}
+                                sx={{
+                                  borderRadius: "20px",
+                                  color: career.color ?? verde,
+                                  borderColor: career.color ?? verde,
+                                  fontWeight: 700,
+                                }}
                               >
                                 Ver perfil
                               </Button>
@@ -250,12 +195,14 @@ export default function GeneralListSection({
                             </Box>
                           </ListItem>
 
-                          {idx < students.length - 1 && <Divider variant="inset" />}
+                          {idx < students.length - 1 && <Divider />}
                         </Box>
                       );
                     })
                   ) : (
-                    <Typography sx={{ p: 3, textAlign: "center", color: "#999" }}>No hay estudiantes registrados</Typography>
+                    <Typography sx={{ p: 3, textAlign: "center", color: "#999" }}>
+                      No hay estudiantes registrados
+                    </Typography>
                   )}
                 </List>
               </AccordionDetails>

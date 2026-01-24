@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -8,33 +8,44 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  TextField,
   DialogActions,
   Container,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 
+// --- FECHAS ---
+import dayjs, { Dayjs } from "dayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+
+// Servicios
 import { importStudentsXlsx, listStudents } from "../services/adminStudentService";
 import type { AdminStudentRow } from "../services/adminStudentService";
 import { logout } from "../services/authService";
-import { createCareer } from "../services/careerService"; 
+import { createCareer } from "../services/careerService";
 import { api } from "../api/api";
+import {
+  createAcademicPeriod,
+  listAcademicPeriods,
+  type AcademicPeriodDto,
+} from "../services/periodService";
+import { listCareerCards, type CareerCardDto } from "../services/adminCareerCardsService";
 
+// Componentes
 import AssignCareerModal from "../components/AssignCareerModal";
 import CreateUserModal from "../components/CreateUserModal";
 import AdminHeaderBar from "../components/AdminHeaderBar";
 import CareersSection from "../components/CareersSection";
 import GeneralListSection from "../components/GeneralListSection";
 
-import softwareImg from "../assets/imagenes/Desarrollo de Software.png";
-import disenoImg from "../assets/imagenes/Diseno-Grafico.png";
-import gastronomiaImg from "../assets/imagenes/Gastronomia.png";
-import marketingImg from "../assets/imagenes/Marketing Digital y Negocios.png";
-import talentoImg from "../assets/imagenes/Talento Humano.png";
-import turismoImg from "../assets/imagenes/Turismo.png";
-import enfermeriaImg from "../assets/imagenes/Enfermeria.png";
+import { useActivePeriod } from "../hooks/useActivePeriod";
 
 const VERDE_INSTITUCIONAL = "#008B8B";
 
+// Tipos legacy (necesario para que Typescript no llore en el Modal, 
+// aunque ya no usamos la data hardcodeada)
 export type CareerItem = {
   key: string;
   label: string;
@@ -45,251 +56,477 @@ export type CareerItem = {
   isFixed?: boolean;
 };
 
-const INITIAL_CAREERS: CareerItem[] = [
-  { key: "Desarrollo de software", label: "DESARROLLO DE SOFTWARE", cover: softwareImg, color: "#6a1b9a", imgPos: "center 25%", isFixed: true },
-  { key: "Diseño gráfico", label: "DISEÑO GRÁFICO", cover: disenoImg, color: "#00acc1", imgPos: "center 5%", isFixed: true },
-  { key: "Gastronomía", label: "GASTRONOMÍA", cover: gastronomiaImg, color: "#2e7d32", imgPos: "center 25%", isFixed: true },
-  { key: "Marketing digital y negocios", label: "MARKETING DIGITAL", cover: marketingImg, color: "#ef6c00", imgPos: "center 5%", isFixed: true },
-  { key: "Turismo", label: "TURISMO", cover: turismoImg, color: "#9e9d24", imgPos: "center 28%", isFixed: true },
-  { key: "Talento humano", label: "TALENTO HUMANO", cover: talentoImg, color: "#1565c0", imgPos: "center 25%", isFixed: true },
-  { key: "Enfermería", label: "ENFERMERÍA", cover: enfermeriaImg, color: "#26a69a", imgPos: "center 2%", isFixed: true },
-  { key: "Electricidad", label: "ELECTRICIDAD", color: "#f9a825", isFixed: true },
-  { key: "Contabilidad y asesoría tributaria", label: "CONTABILIDAD", color: "#c62828", isFixed: true },
-  { key: "Redes y Telecomunicaciones", label: "REDES Y TELECOM.", color: "#37474f", isFixed: true },
-];
-
 export default function AdminStudentsPage() {
+  const nav = useNavigate();
+
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [rows, setRows] = useState<AdminStudentRow[]>([]);
-  const nav = useNavigate();
 
+  // Cards del backend (Fuente de verdad única para carreras)
+  const [careerCards, setCareerCards] = useState<CareerCardDto[]>([]);
+
+  // Hook periodo activo
+  const activePeriod = useActivePeriod();
+
+  // Periodos (selector)
+  const [periods, setPeriods] = useState<AcademicPeriodDto[]>([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<number | "ALL">("ALL");
+
+  // Modales
   const [openAssignCareer, setOpenAssignCareer] = useState(false);
   const [openCreateUser, setOpenCreateUser] = useState(false);
   const [openAddCareer, setOpenAddCareer] = useState(false);
   const [openAdminProfile, setOpenAdminProfile] = useState(false);
-  const [openTotalsMatriculados, setOpenTotalsMatriculados] = useState(false);
-  const [openTotalsReprobados, setOpenTotalsReprobados] = useState(false);
 
+  // Modal crear periodo
+  const [openPeriodModal, setOpenPeriodModal] = useState(false);
+  const [periodStart, setPeriodStart] = useState<Dayjs | null>(dayjs());
+  const [periodEnd, setPeriodEnd] = useState<Dayjs | null>(dayjs().add(5, "month"));
+  const [periodIsActive, setPeriodIsActive] = useState(true);
+
+  // Misc
   const [searchTerm, setSearchTerm] = useState("");
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [adminProfile, setAdminProfile] = useState<any | null>(null);
 
-  const [careers, setCareers] = useState<CareerItem[]>(() => {
-    const saved = localStorage.getItem("ist_custom_careers");
-    return saved ? [...INITIAL_CAREERS, ...JSON.parse(saved)] : INITIAL_CAREERS;
-  });
-
+  // Modal añadir carrera (inputs)
   const [newCareerName, setNewCareerName] = useState("");
   const [newCareerColor, setNewCareerColor] = useState("#546e7a");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const load = async () => {
+  const handleHardRefresh = () => window.location.reload();
+
+  // -------------------------
+  // LOADERS
+  // -------------------------
+  const loadPeriods = async () => {
+    try {
+      const ps = await listAcademicPeriods();
+      setPeriods(Array.isArray(ps) ? ps : []);
+    } catch {
+      setPeriods([]);
+    }
+  };
+
+  const loadCareerCards = async (periodId: number | "ALL") => {
+    try {
+      const pid = periodId === "ALL" ? (activePeriod.periodId ?? undefined) : periodId;
+      const data = await listCareerCards(pid);
+      setCareerCards(Array.isArray(data) ? data : []);
+    } catch {
+      setCareerCards([]);
+    }
+  };
+
+  const loadStudents = async (periodId: number | "ALL") => {
     setLoading(true);
     try {
-      const data = await listStudents();
-      setRows(data || []);
+      const data = periodId === "ALL" ? await listStudents() : await listStudents(periodId);
+      setRows(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      if (e?.response?.status === 401) { logout(); nav("/"); }
-    } finally { setLoading(false); }
+      if (e?.response?.status === 401 || e?.response?.status === 403) {
+        logout();
+        nav("/");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // -------------------------
+  // INIT
+  // -------------------------
   useEffect(() => {
-    load();
-    const loadMe = async () => {
-      try { const res = await api.get("/me"); setAdminProfile(res.data); } catch { setAdminProfile(null); }
-    };
-    loadMe();
+    (async () => {
+      await loadPeriods();
+
+      const ls = localStorage.getItem("adminPeriodId");
+      if (ls && Number.isFinite(Number(ls))) {
+        const pid = Number(ls);
+        setSelectedPeriodId(pid);
+        await loadStudents(pid);
+        await loadCareerCards(pid);
+        return;
+      }
+
+      if (activePeriod?.periodId) {
+        setSelectedPeriodId(activePeriod.periodId);
+        localStorage.setItem("adminPeriodId", String(activePeriod.periodId));
+        await loadStudents(activePeriod.periodId);
+        await loadCareerCards(activePeriod.periodId);
+        return;
+      }
+
+      setSelectedPeriodId("ALL");
+      await loadStudents("ALL");
+      await loadCareerCards("ALL");
+    })();
+
+    (async () => {
+      try {
+        const res = await api.get("/me");
+        setAdminProfile(res.data);
+      } catch {
+        setAdminProfile(null);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ ESTA FUNCIÓN HARÁ QUE LA PÁGINA SE RECARGUE COMO TÚ QUIERES
-  const handleHardRefresh = () => {
-    window.location.reload();
+  // Si activePeriod carga después
+  useEffect(() => {
+    if (!activePeriod.loading && activePeriod.periodId && selectedPeriodId === "ALL") {
+      const ls = localStorage.getItem("adminPeriodId");
+      if (!ls) {
+        setSelectedPeriodId(activePeriod.periodId);
+        localStorage.setItem("adminPeriodId", String(activePeriod.periodId));
+        loadStudents(activePeriod.periodId);
+        loadCareerCards(activePeriod.periodId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePeriod.periodId, activePeriod.loading]);
+
+  // Cambiar periodo
+  const handleSelectPeriod = async (val: number | "ALL") => {
+    setSelectedPeriodId(val);
+    if (val === "ALL") localStorage.removeItem("adminPeriodId");
+    else localStorage.setItem("adminPeriodId", String(val));
+
+    await loadStudents(val);
+    await loadCareerCards(val);
   };
 
-  const normalizeCareer = (v?: string) => {
-    const x = (v ?? "").trim().toLowerCase();
-    if (x.includes("desarrollo") && x.includes("software")) return "Desarrollo de software";
-    if (x.includes("dise") && x.includes("gr")) return "Diseño gráfico";
-    if (x.includes("gastr")) return "Gastronomía";
-    if (x.includes("marketing")) return "Marketing digital y negocios";
-    if (x.includes("turismo")) return "Turismo";
-    if (x.includes("talento")) return "Talento humano";
-    if (x.includes("enfer")) return "Enfermería";
-    if (x.includes("electr")) return "Electricidad";
-    if (x.includes("contab") || x.includes("tribut")) return "Contabilidad y asesoría tributaria";
-    if (x.includes("redes") || x.includes("telecom")) return "Redes y Telecomunicaciones";
-    return v?.trim() || "Otras Carreras";
-  };
-
+  // -------------------------
+  // IMPORT EXCEL
+  // -------------------------
   const handleFileUpload = async (file: File) => {
     setImporting(true);
     try {
-      await importStudentsXlsx(file);
-      await load();
-    } catch (e) { console.error("Error"); } finally { setImporting(false); }
+      const pid = selectedPeriodId !== "ALL" ? selectedPeriodId : activePeriod.periodId ?? null;
+
+      if (!pid) {
+        alert(activePeriod.error ?? "No hay periodo activo.");
+        setOpenPeriodModal(true);
+        return;
+      }
+
+      await importStudentsXlsx(file, pid);
+
+      const refreshPid = selectedPeriodId !== "ALL" ? selectedPeriodId : pid;
+      await loadStudents(refreshPid);
+      await loadCareerCards(refreshPid);
+
+      alert("Importación completada ✅");
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? "No se pudo importar el Excel");
+    } finally {
+      setImporting(false);
+    }
   };
 
-  const totalMatriculados = rows.length;
-  const totalReprobados = useMemo(() => {
-    return rows.filter((s: any) => {
-      const st = (s.status || s.estado)?.toUpperCase();
-      return st === "RETIRADO" || st === "REPROBADO";
-    }).length;
-  }, [rows]);
+  // -------------------------
+  // ✅ ADAPTER: Convertir backend data -> formato Modal
+  // -------------------------
+  const availableCareersFromBackend: CareerItem[] = useMemo(() => {
+    return careerCards.map((c) => ({
+      key: String(c.id), // ID real del backend convertido a string
+      label: c.name.toUpperCase(),
+      color: c.color ?? "#546e7a",
+      // Construimos la URL completa si existe imagen
+      imageUrl: c.coverImage 
+        ? `${api.defaults.baseURL}/admin/careers/cover/${c.coverImage}` 
+        : undefined,
+      isFixed: true 
+    }));
+  }, [careerCards]);
 
-  const totalsByCareer = useMemo(() => {
-    return careers.map((c) => {
-      const students = rows.filter((r: any) => normalizeCareer(r.career) === c.key);
-      const repros = students.filter((s: any) => {
-        const st = (s.status || s.estado)?.toUpperCase();
-        return st === "RETIRADO" || st === "REPROBADO";
-      }).length;
-      return { key: c.key, label: c.label, total: students.length, reprobados: repros, color: c.color };
-    });
-  }, [rows, careers]);
-
+  // -------------------------
+  // AGRUPAR POR careerId (para UI)
+  // -------------------------
   const groupedStudents = useMemo(() => {
-    const groups: Record<string, AdminStudentRow[]> = {};
+    const groups: Record<number, AdminStudentRow[]> = {};
     const q = searchTerm.toLowerCase().trim();
+
     rows.forEach((s: any) => {
-      const name = `${s.firstName} ${s.lastName}`.toLowerCase();
-      if (!q || name.includes(q) || String(s.dni).includes(q)) {
-        const key = normalizeCareer(s.career);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(s);
+      const name = `${s.firstName || ""} ${s.lastName || ""}`.toLowerCase();
+      const dni = String(s.dni ?? s.cedula ?? "");
+
+      if (!q || name.includes(q) || dni.includes(q)) {
+        const cid = Number(s.careerId);
+        if (!Number.isFinite(cid)) return;
+
+        if (!groups[cid]) groups[cid] = [];
+        groups[cid].push(s);
       }
     });
+
     return groups;
   }, [rows, searchTerm]);
 
+  // Stats por carrera
+  const careerStats = useMemo(() => {
+    return careerCards.map((c) => {
+      const students = groupedStudents[c.id] || [];
+      const reprobados = students.filter((s: any) => {
+        const st = (s.status || s.estado || "").toUpperCase();
+        return st === "REPROBADO" || st === "RETIRADO";
+      }).length;
+
+      return {
+        key: String(c.id),
+        label: c.name,
+        total: students.length,
+        reprobados,
+        color: c.color ?? "#546e7a",
+      };
+    });
+  }, [careerCards, groupedStudents]);
+
+  // -------------------------
+  // CREATE CAREER (Limpio: solo backend)
+  // -------------------------
   const handleAddCareer = async () => {
     if (!newCareerName.trim()) return;
+
     try {
       const formData = new FormData();
       formData.append("name", newCareerName.trim());
       formData.append("color", newCareerColor);
       if (selectedFile) formData.append("image", selectedFile);
-      try { await createCareer(formData); } catch (err) {}
-      let tempUrl = selectedFile ? URL.createObjectURL(selectedFile) : "";
-      const newEntry: CareerItem = { key: newCareerName.trim(), label: newCareerName.toUpperCase(), color: newCareerColor, isFixed: false, imageUrl: tempUrl };
-      const updated = [...careers, newEntry];
-      setCareers(updated);
-      localStorage.setItem("ist_custom_careers", JSON.stringify(updated.filter(c => !c.isFixed)));
+
+      // 1. Guardar en backend
+      await createCareer(formData);
+      
+      // 2. Recargar lista real
+      const pid = selectedPeriodId === "ALL" ? (activePeriod.periodId ?? "ALL") : selectedPeriodId;
+      await loadCareerCards(pid);
+
+      // 3. Resetear modal
       setOpenAddCareer(false);
       setNewCareerName("");
       setSelectedFile(null);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error creating career", e);
+    }
+  };
+
+  // -------------------------
+  // CREATE PERIOD
+  // -------------------------
+  const handleCreatePeriod = async () => {
+    try {
+      if (!periodStart || !periodEnd) {
+        alert("Debes seleccionar fecha inicio y fin");
+        return;
+      }
+
+      const created = await createAcademicPeriod({
+        startDate: periodStart.format("YYYY-MM-DD"),
+        endDate: periodEnd.format("YYYY-MM-DD"),
+        isActive: periodIsActive,
+      });
+
+      alert(`Periodo creado ✅: ${created.name}`);
+      setOpenPeriodModal(false);
+      await loadPeriods();
+
+      if (created.isActive) {
+        setSelectedPeriodId(created.id);
+        localStorage.setItem("adminPeriodId", String(created.id));
+        await loadStudents(created.id);
+        await loadCareerCards(created.id);
+      }
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? "No se pudo crear el periodo");
+    }
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", backgroundColor: "#f4f7f6" }}>
-      <AdminHeaderBar
-        verde={VERDE_INSTITUCIONAL}
-        importing={loading || importing}
-        onOpenAssignCareer={() => setOpenAssignCareer(true)}
-        onOpenCreateUser={() => setOpenCreateUser(true)}
-        onRefresh={handleHardRefresh} // ✅ AHORA RECARGA LA PÁGINA COMPLETA
-        onLogout={() => { logout(); nav("/"); }}
-        userMenuAnchor={userMenuAnchor}
-        openUserMenu={Boolean(userMenuAnchor)}
-        onOpenMenu={(e) => setUserMenuAnchor(e.currentTarget)}
-        onCloseMenu={() => setUserMenuAnchor(null)}
-        onOpenProfile={() => { setOpenAdminProfile(true); setUserMenuAnchor(null); }}
-        onOpenTotalsMatriculados={() => { setOpenTotalsMatriculados(true); setUserMenuAnchor(null); }}
-        onOpenTotalsRetirados={() => { setOpenTotalsReprobados(true); setUserMenuAnchor(null); }}
-        onUploadFile={handleFileUpload} 
-      />
-
-      <Container maxWidth={false} sx={{ py: 4, display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-        <CareersSection
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", backgroundColor: "#f4f7f6" }}>
+        <AdminHeaderBar
           verde={VERDE_INSTITUCIONAL}
-          careers={careers}
-          rows={rows}
-          normalizeCareer={normalizeCareer}
-          onCareerClick={(key) => nav(`/admin/students/career/${encodeURIComponent(key)}`)}
-          onOpenAddCareer={() => setOpenAddCareer(true)}
-          onDeleteCareer={(key) => {
-            const updated = careers.filter(c => c.key !== key);
-            setCareers(updated);
-            localStorage.setItem("ist_custom_careers", JSON.stringify(updated.filter(c => !c.isFixed)));
+          importing={loading || importing}
+          onOpenAssignCareer={() => setOpenAssignCareer(true)}
+          onOpenCreateUser={() => setOpenCreateUser(true)}
+          onRefresh={handleHardRefresh}
+          onLogout={() => {
+            logout();
+            nav("/");
           }}
+          userMenuAnchor={userMenuAnchor}
+          openUserMenu={Boolean(userMenuAnchor)}
+          onOpenMenu={(e) => setUserMenuAnchor(e.currentTarget)}
+          onCloseMenu={() => setUserMenuAnchor(null)}
+          onOpenProfile={() => {
+            setOpenAdminProfile(true);
+            setUserMenuAnchor(null);
+          }}
+          onUploadFile={handleFileUpload}
+          onOpenPeriodModal={() => setOpenPeriodModal(true)}
+          periods={periods}
+          selectedPeriodId={selectedPeriodId}
+          activePeriod={activePeriod}
+          onChangePeriod={handleSelectPeriod}
+          onReloadPeriods={loadPeriods}
+          careerStats={careerStats}
         />
 
-        <GeneralListSection
-          verde={VERDE_INSTITUCIONAL}
-          careersVisible={careers}
-          groupedStudents={groupedStudents}
-          statsByCareer={{}}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          normalizeCareer={normalizeCareer}
-          getStudentName={(s) => `${s.firstName || ""} ${s.lastName || ""}`}
-          getSemaforo={() => ({ bg: "#e8f5e9", border: "#2e7d32", chipBg: "#2e7d32", chipText: "#fff", label: "SIN NOVEDAD" })}
-          onViewProfile={(id) => nav(`/admin/students/${id}`)}
-          onClearIncidents={() => {}}
+        <Container maxWidth={false} sx={{ py: 4, display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+          <CareersSection
+            verde={VERDE_INSTITUCIONAL}
+            cards={careerCards}
+            onCareerClick={(careerId) => {
+              const pid = selectedPeriodId === "ALL" ? (activePeriod.periodId ?? "") : selectedPeriodId;
+              const card = careerCards.find((c) => c.id === careerId);
+              const cName = card?.name ?? "Carrera";
+
+              const base = `/admin/students/by-career?careerId=${careerId}&careerName=${encodeURIComponent(cName)}`;
+              nav(pid ? `${base}&periodId=${pid}` : base);
+            }}
+            onOpenAddCareer={() => setOpenAddCareer(true)}
+            onGoPredefense={() => nav("/admin/predefense")}
+            onGoFinalDefense={() => nav("/admin/final-defense")}
+            onReloadCards={() => loadCareerCards(selectedPeriodId)}
+          />
+
+          <GeneralListSection
+            verde={VERDE_INSTITUCIONAL}
+            careerCards={careerCards}
+            groupedStudents={groupedStudents}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            getStudentName={(s) => `${(s as any).firstName || ""} ${(s as any).lastName || ""}`}
+            getSemaforo={() => ({
+              bg: "#e8f5e9",
+              border: "#2e7d32",
+              chipBg: "#2e7d32",
+              chipText: "#fff",
+              label: "SIN NOVEDAD",
+            })}
+            onViewProfile={(id) => nav(`/admin/students/${id}`)}
+            onClearIncidents={() => {}}
+          />
+        </Container>
+
+        {/* MODAL: Crear período */}
+        <Dialog open={openPeriodModal} onClose={() => setOpenPeriodModal(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ fontWeight: 700, bgcolor: VERDE_INSTITUCIONAL, color: "#fff" }}>
+            Crear Período Académico
+          </DialogTitle>
+
+          <DialogContent dividers>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 1 }}>
+              <DatePicker
+                label="Fecha de Inicio"
+                value={periodStart}
+                onChange={(newValue) => setPeriodStart(newValue)}
+                slotProps={{ textField: { fullWidth: true } }}
+              />
+
+              <DatePicker
+                label="Fecha de Fin"
+                value={periodEnd}
+                onChange={(newValue) => setPeriodEnd(newValue)}
+                slotProps={{ textField: { fullWidth: true } }}
+              />
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={periodIsActive}
+                    onChange={(e) => setPeriodIsActive(e.target.checked)}
+                    sx={{ color: VERDE_INSTITUCIONAL, "&.Mui-checked": { color: VERDE_INSTITUCIONAL } }}
+                  />
+                }
+                label="Marcar como período activo"
+              />
+            </Box>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setOpenPeriodModal(false)}>Cancelar</Button>
+            <Button onClick={handleCreatePeriod} variant="contained" sx={{ bgcolor: VERDE_INSTITUCIONAL, fontWeight: 800 }}>
+              Crear
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* MODAL: Perfil admin */}
+        <Dialog open={openAdminProfile} onClose={() => setOpenAdminProfile(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ fontWeight: 700 }}>Perfil del Administrador</DialogTitle>
+          <DialogContent dividers>
+            <Typography sx={{ mb: 1 }}>
+              <b>Nombre:</b> {adminProfile?.fullName || "-"}
+            </Typography>
+            <Typography>
+              <b>Cédula:</b> {adminProfile?.dni || "-"}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenAdminProfile(false)}>Cerrar</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* MODAL: Añadir carrera (legacy UI, pero backend logic) */}
+        <Dialog open={openAddCareer} onClose={() => setOpenAddCareer(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ fontWeight: 700 }}>Añadir Carrera</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+              <input
+                placeholder="Nombre"
+                value={newCareerName}
+                onChange={(e) => setNewCareerName(e.target.value)}
+                style={{ padding: 12, borderRadius: 8, border: "1px solid #ddd" }}
+              />
+
+              <Typography variant="caption" sx={{ mt: 1, display: "block" }}>
+                Color:
+              </Typography>
+
+              <input
+                type="color"
+                value={newCareerColor}
+                onChange={(e) => setNewCareerColor(e.target.value)}
+                style={{ width: "100%", height: 40 }}
+              />
+
+              <Button variant="outlined" component="label" fullWidth sx={{ mt: 1 }}>
+                {selectedFile ? selectedFile.name : "Subir Portada"}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                />
+              </Button>
+            </Box>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setOpenAddCareer(false)}>Cancelar</Button>
+            <Button onClick={handleAddCareer} variant="contained" sx={{ bgcolor: VERDE_INSTITUCIONAL }}>
+              Guardar
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ✅ MODAL ASIGNAR: Usa datos reales del backend */}
+        <AssignCareerModal
+          open={openAssignCareer}
+          onClose={() => setOpenAssignCareer(false)}
+          onSuccess={() => loadStudents(selectedPeriodId)}
+          availableCareers={availableCareersFromBackend}
         />
-      </Container>
 
-      {/* MODALES ESTADÍSTICAS */}
-      <Dialog open={openTotalsMatriculados} onClose={() => setOpenTotalsMatriculados(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, bgcolor: VERDE_INSTITUCIONAL, color: "#fff" }}>
-          Total Matriculados: {totalMatriculados}
-        </DialogTitle>
-        <DialogContent dividers>
-          {totalsByCareer.map((c) => (
-            <Box key={c.key} sx={{ display: "flex", justifyContent: "space-between", mb: 1, p: 1, borderBottom: "1px solid #eee" }}>
-              <Typography sx={{ fontWeight: 600 }}>{c.label}</Typography>
-              <Typography sx={{ fontWeight: 700, color: c.color }}>{c.total}</Typography>
-            </Box>
-          ))}
-        </DialogContent>
-        <DialogActions><Button onClick={() => setOpenTotalsMatriculados(false)}>Cerrar</Button></DialogActions>
-      </Dialog>
-
-      <Dialog open={openTotalsReprobados} onClose={() => setOpenTotalsReprobados(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, bgcolor: "#d32f2f", color: "#fff" }}>
-          Total Reprobados: {totalReprobados}
-        </DialogTitle>
-        <DialogContent dividers>
-          {totalsByCareer.map((c) => (
-            <Box key={c.key} sx={{ display: "flex", justifyContent: "space-between", mb: 1, p: 1, borderBottom: "1px solid #eee" }}>
-              <Typography sx={{ fontWeight: 600 }}>{c.label}</Typography>
-              <Typography sx={{ fontWeight: 700, color: "#d32f2f" }}>{c.reprobados}</Typography>
-            </Box>
-          ))}
-        </DialogContent>
-        <DialogActions><Button onClick={() => setOpenTotalsReprobados(false)}>Cerrar</Button></DialogActions>
-      </Dialog>
-
-      <Dialog open={openAdminProfile} onClose={() => setOpenAdminProfile(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Perfil del Administrador</DialogTitle>
-        <DialogContent dividers>
-          <Typography sx={{ mb: 1 }}><b>Nombre:</b> {adminProfile?.fullName || "-"}</Typography>
-          <Typography><b>Cédula:</b> {adminProfile?.dni || "-"}</Typography>
-        </DialogContent>
-        <DialogActions><Button onClick={() => setOpenAdminProfile(false)}>Cerrar</Button></DialogActions>
-      </Dialog>
-
-      <Dialog open={openAddCareer} onClose={() => setOpenAddCareer(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Añadir Carrera</DialogTitle>
-        <DialogContent>
-          <TextField label="Nombre" fullWidth margin="dense" value={newCareerName} onChange={(e) => setNewCareerName(e.target.value)} />
-          <Typography variant="caption" sx={{ mt: 2, display: 'block' }}>Color:</Typography>
-          <input type="color" value={newCareerColor} onChange={(e) => setNewCareerColor(e.target.value)} style={{ width: "100%", height: 40, marginTop: 5 }} />
-          <Button variant="outlined" component="label" fullWidth sx={{ mt: 3 }}>
-            {selectedFile ? selectedFile.name : "Subir Portada"}
-            <input type="file" hidden accept="image/*" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
-          </Button>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenAddCareer(false)}>Cancelar</Button>
-          <Button onClick={handleAddCareer} variant="contained" sx={{ bgcolor: VERDE_INSTITUCIONAL }}>Guardar</Button>
-        </DialogActions>
-      </Dialog>
-
-      <AssignCareerModal open={openAssignCareer} onClose={() => setOpenAssignCareer(false)} onSuccess={load} availableCareers={careers} />
-      <CreateUserModal open={openCreateUser} onClose={() => setOpenCreateUser(false)} onSuccess={load} />
-    </Box>
+        <CreateUserModal
+          open={openCreateUser}
+          onClose={() => setOpenCreateUser(false)}
+          onSuccess={() => loadStudents(selectedPeriodId)}
+        />
+      </Box>
+    </LocalizationProvider>
   );
 }

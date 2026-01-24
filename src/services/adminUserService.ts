@@ -1,12 +1,14 @@
+// src/services/adminUserService.ts
 import { api } from "../api/api";
 
-// -------------------- CREATE --------------------
+export type RoleName = "ADMIN" | "COORDINATOR" | "TUTOR" | "JURY";
+
 export type CreateUserRequest = {
   username: string;
   password: string;
   fullName: string;
   email: string;
-  roles: Array<"ADMIN" | "COORDINATOR" | "TUTOR">;
+  roles: RoleName[];
 };
 
 export type UserResponse = {
@@ -15,7 +17,7 @@ export type UserResponse = {
   fullName: string;
   email: string;
   enabled: boolean;
-  roles: string[];
+  roles: string[]; // te lo devuelve como ROLE_ADMIN etc o como strings, depende tu back
 };
 
 export async function createUser(req: CreateUserRequest): Promise<UserResponse> {
@@ -23,14 +25,9 @@ export async function createUser(req: CreateUserRequest): Promise<UserResponse> 
   return res.data;
 }
 
-// -------------------- LIST --------------------
 export async function listUsers(role?: string): Promise<UserResponse[]> {
   const res = await api.get<UserResponse[]>("/admin/users", {
     params: role ? { role } : undefined,
   });
   return res.data;
-}
-
-export async function listUsersByRole(role: "COORDINATOR" | "TUTOR"): Promise<UserResponse[]> {
-  return listUsers(role);
 }

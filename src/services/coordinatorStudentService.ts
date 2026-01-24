@@ -1,33 +1,10 @@
 import { api } from "../api/api";
 
-export type CoordinatorStudentRow = {
-  id: number;
-  dni: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  corte: string;
-  section: string;
-  modality?: string | null;
-  career: string;
-  titulationType: string;
-  status: string;
-
-  tutorId?: number | null;
-  tutorName?: string | null;
-  tutorUsername?: string | null;
-
-  coordinatorId?: number | null;
-  coordinatorName?: string | null;
-
-  thesisProject?: string | null;
-  thesisProjectSetAt?: string | null;
-};
-
+/** Tipos (ajusta si tu backend devuelve más campos) */
 export type IncidentDto = {
   id: number;
   stage: string;
-  date: string;
+  date: string;       // "2026-01-01"
   reason: string;
   action: string;
   createdAt: string;
@@ -57,6 +34,12 @@ export type StudentDetailDto = {
 
   tutorId?: number | null;
   coordinatorId?: number | null;
+
+  tutorName?: string | null;
+  tutorUsername?: string | null;
+  coordinatorName?: string | null;
+  coordinatorUsername?: string | null;
+
   thesisProject?: string | null;
   thesisProjectSetAt?: string | null;
 
@@ -68,7 +51,7 @@ export type StudentDetailDto = {
 
 export type CreateIncidentRequest = {
   stage: string;
-  date: string;
+  date: string; // "YYYY-MM-DD"
   reason: string;
   action: string;
 };
@@ -82,24 +65,46 @@ export type AssignProjectRequest = {
   tutorId: number;
 };
 
-export async function listCoordinatorStudents() {
-  const res = await api.get<CoordinatorStudentRow[]>("/coordinator/students");
+/** ✅ GET detalle con periodId */
+export async function getStudentDetail(
+  id: number | string,
+  periodId: number
+): Promise<StudentDetailDto> {
+  const res = await api.get<StudentDetailDto>(`/coordinator/students/${id}`, {
+    params: { periodId },
+  });
   return res.data;
 }
 
-export async function getStudentDetail(id: number | string) {
-  const res = await api.get<StudentDetailDto>(`/coordinator/students/${id}`);
-  return res.data;
+/** ✅ POST incidencia con periodId */
+export async function createIncident(
+  studentId: number | string,
+  periodId: number,
+  body: CreateIncidentRequest
+) {
+  await api.post(`/coordinator/students/${studentId}/incidents`, body, {
+    params: { periodId },
+  });
 }
 
-export async function assignProject(studentId: number | string, body: AssignProjectRequest) {
-  await api.put(`/coordinator/students/${studentId}/project`, body);
+/** ✅ POST observación con periodId */
+export async function createObservation(
+  studentId: number | string,
+  periodId: number,
+  body: CreateObservationRequest
+) {
+  await api.post(`/coordinator/students/${studentId}/observations`, body, {
+    params: { periodId },
+  });
 }
 
-export async function createIncident(studentId: number | string, body: CreateIncidentRequest) {
-  await api.post(`/coordinator/students/${studentId}/incidents`, body);
-}
-
-export async function createObservation(studentId: number | string, body: CreateObservationRequest) {
-  await api.post(`/coordinator/students/${studentId}/observations`, body);
+/** ✅ POST asignación proyecto+tutor con periodId */
+export async function assignProject(
+  studentId: number | string,
+  periodId: number,
+  body: AssignProjectRequest
+) {
+  await api.post(`/coordinator/students/${studentId}/assign`, body, {
+    params: { periodId },
+  });
 }

@@ -73,6 +73,8 @@ export default function AdminCreateUserPage() {
               <Option value="ADMIN">ADMIN</Option>
               <Option value="COORDINATOR">COORDINATOR</Option>
               <Option value="TUTOR">TUTOR</Option>
+              <Option value="JURY">JURADO</Option>
+
             </Select>
           </Form.Item>
 

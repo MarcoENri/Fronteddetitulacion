@@ -1,22 +1,32 @@
+// src/services/adminAssignService.ts
 import { api } from "../api/api";
 
-// Cambiamos el tipo a 'any' o 'FormData' para que acepte el archivo de imagen
-export async function assignStudent(studentId: number, body: FormData): Promise<void> {
-  await api.put(`/admin/students/${studentId}/assign`, body, {
-    headers: {
-      // Importante: Esto le dice al servidor que va un archivo incluido
-      "Content-Type": "multipart/form-data",
-    },
-  });
-}
-
 export type AdminAssignCareerRequest = {
+  careerId: number;
   coordinatorId: number;
   tutorId?: number | null;
   projectName?: string | null;
-  onlyUnassigned?: boolean; 
+  onlyUnassigned?: boolean;
+  academicPeriodId?: number | null;
 };
 
-export async function assignCareer(careerId: number, body: AdminAssignCareerRequest): Promise<void> {
-  await api.put(`/admin/careers/${careerId}/assign`, body);
+export async function assignByCareer(req: AdminAssignCareerRequest) {
+  const res = await api.post("/admin/assign/career", req);
+  return res.data;
+}
+
+export type AdminAssignStudentRequest = {
+  coordinatorId: number;
+  academicPeriodId?: number | null;
+};
+
+export async function assignStudentCoordinator(studentId: number, req: AdminAssignStudentRequest) {
+  // ✅ JSON puro
+  const res = await api.post(`/admin/assign/students/${studentId}/coordinator`, req);
+  return res.data;
+}
+
+// ✅ alias (para que tu modal use assignStudent)
+export async function assignStudent(studentId: number, req: AdminAssignStudentRequest) {
+  return assignStudentCoordinator(studentId, req);
 }

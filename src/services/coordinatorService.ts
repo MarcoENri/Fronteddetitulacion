@@ -1,38 +1,12 @@
 import { api } from "../api/api";
 
-export type CoordinatorStudentRow = {
-  id: number;
-  dni: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  corte: string;
-  section: string;
-  modality?: string | null;
-  career: string;
-  titulationType: string;
-  status: string;
-
-  tutorId?: number | null;
-  coordinatorId?: number | null;
-
-  // ✅ NUEVO
-  tutorName?: string | null;
-  tutorUsername?: string | null;
-  coordinatorName?: string | null;
-  coordinatorUsername?: string | null;
-
-  thesisProject?: string | null;
-  thesisProjectSetAt?: string | null;
-};
-
 export type IncidentDto = {
   id: number;
   stage: string;
-  date: string;      // LocalDate -> string en JSON
+  date: string;
   reason: string;
   action: string;
-  createdAt: string; // LocalDateTime -> string
+  createdAt: string;
   createdByUserId?: number | null;
 };
 
@@ -59,18 +33,25 @@ export type StudentDetailDto = {
 
   tutorId?: number | null;
   coordinatorId?: number | null;
+
+  tutorName?: string | null;
+  tutorUsername?: string | null;
+  coordinatorName?: string | null;
+  coordinatorUsername?: string | null;
+
   thesisProject?: string | null;
   thesisProjectSetAt?: string | null;
 
   incidentCount: number;
   observationCount: number;
+
   incidents: IncidentDto[];
   observations: ObservationDto[];
 };
 
 export type CreateIncidentRequest = {
   stage: string;
-  date: string; // "2026-01-01"
+  date: string; // "YYYY-MM-DD"
   reason: string;
   action: string;
 };
@@ -79,20 +60,85 @@ export type CreateObservationRequest = {
   text: string;
 };
 
-export async function listCoordinatorStudents() {
-  const res = await api.get<CoordinatorStudentRow[]>("/coordinator/students");
+export type AssignProjectRequest = {
+  projectName: string;
+  tutorId: number;
+};
+export type CoordinatorStudentRow = {
+  id: number;
+  dni: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  corte: string;
+  section: string;
+  modality?: string | null;
+  career: string;
+  titulationType: string;
+  status: string;
+
+  tutorId?: number | null;
+  coordinatorId?: number | null;
+
+  tutorName?: string | null;
+  tutorUsername?: string | null;
+  coordinatorName?: string | null;
+  coordinatorUsername?: string | null;
+
+  thesisProject?: string | null;
+  thesisProjectSetAt?: string | null;
+
+  incidentCount?: number;
+  observationCount?: number;
+};
+
+// ✅ DETAIL (2 argumentos)
+export async function getStudentDetail(
+  id: number | string,
+  periodId: number
+): Promise<StudentDetailDto> {
+  const res = await api.get<StudentDetailDto>(`/coordinator/students/${id}`, {
+    params: { periodId },
+  });
   return res.data;
 }
 
-export async function getCoordinatorStudentDetail(id: number | string) {
-  const res = await api.get<StudentDetailDto>(`/coordinator/students/${id}`);
+// ✅ CREATE INCIDENT (3 argumentos)
+export async function createIncident(
+  studentId: number | string,
+  periodId: number,
+  body: CreateIncidentRequest
+) {
+  await api.post(`/coordinator/students/${studentId}/incidents`, body, {
+    params: { periodId },
+  });
+}
+
+// ✅ CREATE OBSERVATION (3 argumentos)
+export async function createObservation(
+  studentId: number | string,
+  periodId: number,
+  body: CreateObservationRequest
+) {
+  await api.post(`/coordinator/students/${studentId}/observations`, body, {
+    params: { periodId },
+  });
+}
+
+// ✅ ASSIGN PROJECT + TUTOR (3 argumentos)
+export async function assignProject(
+  studentId: number | string,
+  periodId: number,
+  body: AssignProjectRequest
+) {
+  // ⚠️ Ajusta el endpoint si tu backend lo tiene diferente
+  await api.post(`/coordinator/students/${studentId}/assign-project`, body, {
+    params: { periodId },
+  });
+}
+export async function listCoordinatorStudents(periodId: number): Promise<CoordinatorStudentRow[]> {
+  const res = await api.get<CoordinatorStudentRow[]>("/coordinator/students", {
+    params: { periodId },
+  });
   return res.data;
-}
-
-export async function createCoordinatorIncident(studentId: number | string, body: CreateIncidentRequest) {
-  await api.post(`/coordinator/students/${studentId}/incidents`, body);
-}
-
-export async function createCoordinatorObservation(studentId: number | string, body: CreateObservationRequest) {
-  await api.post(`/coordinator/students/${studentId}/observations`, body);
 }

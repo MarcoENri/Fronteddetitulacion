@@ -71,3 +71,181 @@ export default defineConfig([
   },
 ])
 ```
+
+```
+Fronteddetitulacion
+├─ eslint.config.js
+├─ index.html
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.js
+├─ public
+│  └─ vite.svg
+├─ README.md
+├─ src
+│  ├─ api
+│  │  └─ api.ts
+│  ├─ App.css
+│  ├─ App.tsx
+│  ├─ assets
+│  │  ├─ imagenes
+│  │  │  ├─ Desarrollo de Software.png
+│  │  │  ├─ Diseno-Grafico.png
+│  │  │  ├─ Enfermeria.png
+│  │  │  ├─ Gastronomia.png
+│  │  │  ├─ LogoTec-Photoroom.png
+│  │  │  ├─ Marketing Digital y Negocios.png
+│  │  │  ├─ Talento Humano.png
+│  │  │  ├─ Tecnologico.png
+│  │  │  └─ Turismo.png
+│  │  ├─ imagenes-Tec
+│  │  │  ├─ Contabilidad-y-Asesoria-Tributaria.jpeg
+│  │  │  ├─ Desarrolo-De-Software.jpeg
+│  │  │  ├─ Diseno-Grafico.jpeg
+│  │  │  ├─ Electricidad.jpeg
+│  │  │  ├─ Enfermeria.jpeg
+│  │  │  ├─ Gastronomia.jpeg
+│  │  │  ├─ Logo.jpeg
+│  │  │  ├─ Marketing-Digital-y-Negocios.jpeg
+│  │  │  ├─ Redes-y-Telecomunicaciones.jpeg
+│  │  │  ├─ Suda-Tec.jpeg
+│  │  │  ├─ Talento-Humano.jpeg
+│  │  │  └─ Tec.jpeg
+│  │  └─ react.svg
+│  ├─ components
+│  │  ├─ AdminHeaderBar.tsx
+│  │  ├─ AssignCareerModal.tsx
+│  │  ├─ AssignStudentModal.tsx
+│  │  ├─ AssignTutorBulkModal.tsx
+│  │  ├─ CareersSection.tsx
+│  │  ├─ CreateCareerModal.tsx
+│  │  ├─ CreateUserModal.tsx
+│  │  ├─ GeneralListSection.tsx
+│  │  └─ SendEmailModal.tsx
+│  ├─ index.css
+│  ├─ main.tsx
+│  ├─ pages
+│  │  ├─ AdminCreateUserPage.tsx
+│  │  ├─ AdminStudentsByCareerPage.tsx
+│  │  ├─ AdminStudentsPage.tsx
+│  │  ├─ CoordinatorStudentDetailPage.tsx
+│  │  ├─ CoordinatorStudentsPage.tsx
+│  │  ├─ LoginPage.tsx
+│  │  ├─ StudentDetailPage.tsx
+│  │  ├─ TutorStudentDetailPage.tsx
+│  │  └─ TutorStudentsPage.tsx
+│  └─ services
+│     ├─ adminAssignService.ts
+│     ├─ adminCareersToUserService.ts
+│     ├─ adminLookupService.ts
+│     ├─ adminStudentService.ts
+│     ├─ adminUserService.ts
+│     ├─ authService.ts
+│     ├─ careerService.ts
+│     ├─ coordinatorLookupService.ts
+│     ├─ coordinatorService.ts
+│     ├─ coordinatorStudentService.ts
+│     ├─ studentEmailService.ts
+│     └─ tutorService.ts
+├─ tailwind.config.js
+├─ tsconfig.app.json
+├─ tsconfig.json
+├─ tsconfig.node.json
+└─ vite.config.ts
+
+```
+```
+Fronteddetitulacion
+├─ eslint.config.js
+├─ index.html
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.js
+├─ public
+│  └─ vite.svg
+├─ README.md
+├─ src
+│  ├─ api
+│  │  └─ api.ts
+│  ├─ App.css
+│  ├─ App.tsx
+│  ├─ assets
+│  │  ├─ imagenes
+│  │  │  ├─ Desarrollo de Software.png
+│  │  │  ├─ Diseno-Grafico.png
+│  │  │  ├─ Enfermeria.png
+│  │  │  ├─ Gastronomia.png
+│  │  │  ├─ LogoTec-Photoroom.png
+│  │  │  ├─ Marketing Digital y Negocios.png
+│  │  │  ├─ Talento Humano.png
+│  │  │  ├─ Tecnologico.png
+│  │  │  └─ Turismo.png
+│  │  ├─ imagenes-Tec
+│  │  │  ├─ Contabilidad-y-Asesoria-Tributaria.jpeg
+│  │  │  ├─ Desarrolo-De-Software.jpeg
+│  │  │  ├─ Diseno-Grafico.jpeg
+│  │  │  ├─ Electricidad.jpeg
+│  │  │  ├─ Enfermeria.jpeg
+│  │  │  ├─ Gastronomia.jpeg
+│  │  │  ├─ Logo.jpeg
+│  │  │  ├─ Marketing-Digital-y-Negocios.jpeg
+│  │  │  ├─ Redes-y-Telecomunicaciones.jpeg
+│  │  │  ├─ Suda-Tec.jpeg
+│  │  │  ├─ Talento-Humano.jpeg
+│  │  │  └─ Tec.jpeg
+│  │  └─ react.svg
+│  ├─ components
+│  │  ├─ AcademicPeriodSelect.tsx
+│  │  ├─ AdminHeaderBar.tsx
+│  │  ├─ AssignCareerModal.tsx
+│  │  ├─ AssignStudentModal.tsx
+│  │  ├─ AssignTutorBulkModal.tsx
+│  │  ├─ CareersSection.tsx
+│  │  ├─ CreateCareerModal.tsx
+│  │  ├─ CreateUserModal.tsx
+│  │  ├─ EditIncidentModal.tsx
+│  │  ├─ GeneralListSection.tsx
+│  │  └─ SendEmailModal.tsx
+│  ├─ hooks
+│  │  └─ useActivePeriod.ts
+│  ├─ index.css
+│  ├─ main.tsx
+│  ├─ pages
+│  │  ├─ AdminAcademicPeriodsPage.tsx
+│  │  ├─ AdminCreateUserPage.tsx
+│  │  ├─ AdminPredefensePage.tsx
+│  │  ├─ AdminStudentsByCareerPage.tsx
+│  │  ├─ AdminStudentsPage.tsx
+│  │  ├─ CoordinatorStudentDetailPage.tsx
+│  │  ├─ CoordinatorStudentsPage.tsx
+│  │  ├─ JuryPredefensePage.tsx
+│  │  ├─ LoginPage.tsx
+│  │  ├─ StudentDetailPage.tsx
+│  │  ├─ TutorStudentDetailPage.tsx
+│  │  └─ TutorStudentsPage.tsx
+│  └─ services
+│     ├─ academicPeriodService.ts
+│     ├─ adminAssignService.ts
+│     ├─ adminCareersToUserService.ts
+│     ├─ adminLookupService.ts
+│     ├─ adminStudentService.ts
+│     ├─ adminUserService.ts
+│     ├─ authService.ts
+│     ├─ careerService.ts
+│     ├─ coordinatorLookupService.ts
+│     ├─ coordinatorService.ts
+│     ├─ coordinatorStudentService.ts
+│     ├─ incidentManageService.ts
+│     ├─ periodService.ts
+│     ├─ predefenseAdminService.ts
+│     ├─ predefenseJuryService.ts
+│     ├─ predefenseService.ts
+│     ├─ studentEmailService.ts
+│     └─ tutorService.ts
+├─ tailwind.config.js
+├─ tsconfig.app.json
+├─ tsconfig.json
+├─ tsconfig.node.json
+└─ vite.config.ts
+
+```
