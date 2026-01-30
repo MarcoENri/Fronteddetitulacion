@@ -11,10 +11,13 @@ import {
   Avatar,
   MenuItem,
   Select,
+  IconButton,
+  Tooltip,
+  ListItemText,
 } from "@mui/material";
 import PhotoIcon from "@mui/icons-material/Photo";
 import PaletteIcon from "@mui/icons-material/Palette";
-import SettingsIcon from "@mui/icons-material/Settings";
+import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import { useMemo, useState } from "react";
 
 import type { CareerCardDto } from "../services/adminCareerCardsService";
@@ -48,8 +51,6 @@ export default function CareersSection({
   const [color, setColor] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
-  const selectedCareer = cards.find((c) => c.id === careerId) ?? null;
-
   const previewUrl = useMemo(
     () => (file ? URL.createObjectURL(file) : null),
     [file]
@@ -73,7 +74,6 @@ export default function CareersSection({
 
   return (
     <Box sx={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-      {/* TITULOS */}
       <Box
         sx={{
           width: "100%",
@@ -93,26 +93,54 @@ export default function CareersSection({
           </Typography>
         </Box>
 
-        <Box sx={{ display: "flex", gap: 1.5 }}>
-          <Button variant="contained" onClick={onGoPredefense} sx={{ bgcolor: verde }}>
+        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+          <Button
+            onClick={onGoPredefense}
+            sx={{
+              bgcolor: verde,
+              color: "#fff",
+              borderRadius: "999px",
+              px: 3,
+              fontWeight: 700,
+              "&:hover": { bgcolor: verde },
+            }}
+          >
             Predefensa
           </Button>
-          <Button variant="outlined" onClick={onGoFinalDefense} sx={{ borderColor: verde, color: verde }}>
+
+          <Button
+            onClick={onGoFinalDefense}
+            sx={{
+              bgcolor: verde,
+              color: "#fff",
+              borderRadius: "999px",
+              px: 3,
+              fontWeight: 700,
+              "&:hover": { bgcolor: verde },
+            }}
+          >
             Defensa Final
           </Button>
+
+          <Tooltip title="Modificar tarjetas">
+            <IconButton
+              onClick={() => setOpen(true)}
+              sx={{
+                bgcolor: verde,
+                color: "#fff",
+                width: 44,
+                height: 44,
+                borderRadius: "999px",
+                "&:hover": { bgcolor: verde },
+              }}
+            >
+              <ViewModuleIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
 
-      {/* TARJETAS */}
-      <Box
-        sx={{
-          width: "100%",
-          maxWidth: "1100px",
-          p: 4,
-          borderRadius: "25px",
-          bgcolor: "#fff",
-        }}
-      >
+      <Box sx={{ width: "100%", maxWidth: "1100px", p: 4, borderRadius: "25px", bgcolor: "#fff" }}>
         <Grid container spacing={3} justifyContent="center">
           {cards.map((c) => {
             const cover = coverUrl(c.coverImage);
@@ -130,9 +158,7 @@ export default function CareersSection({
                     overflow: "hidden",
                     cursor: "pointer",
                     transition: "transform .25s ease",
-                    "&:hover": {
-                      transform: "scale(1.07)",
-                    },
+                    "&:hover": { transform: "scale(1.07)" },
                   }}
                 >
                   <Box
@@ -187,41 +213,12 @@ export default function CareersSection({
               </Grid>
             );
           })}
-
-          {/* TARJETA CONFIG */}
-          <Grid>
-            <Paper
-              onClick={() => setOpen(true)}
-              sx={{
-                width: 168,
-                height: 250,
-                borderRadius: "22px",
-                border: "3px dashed #bbb",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "transform .25s ease",
-                "&:hover": {
-                  transform: "scale(1.07)",
-                },
-              }}
-            >
-              <Avatar sx={{ bgcolor: verde, mb: 1 }}>
-                <SettingsIcon />
-              </Avatar>
-              <Typography sx={{ fontWeight: 700, fontSize: "0.75rem", textAlign: "center" }}>
-                Modificar tarjeta
-              </Typography>
-            </Paper>
-          </Grid>
         </Grid>
       </Box>
 
-      {/* MODAL */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Modificar tarjeta</DialogTitle>
+
         <DialogContent dividers>
           <Select
             fullWidth
@@ -233,28 +230,63 @@ export default function CareersSection({
               if (c?.color) setColor(c.color);
             }}
             displayEmpty
-            sx={{ mb: 2 }}
+            sx={{ mb: 2, borderRadius: "14px", fontWeight: 700 }}
+            MenuProps={{
+              PaperProps: {
+                sx: {
+                  borderRadius: "18px",
+                  mt: 1,
+                  maxHeight: 320,
+                  p: 1,
+                },
+              },
+            }}
           >
-            <MenuItem value="">Selecciona carrera</MenuItem>
+            <MenuItem value="" disabled>
+              Selecciona carrera
+            </MenuItem>
+
             {cards.map((c) => (
               <MenuItem
                 key={c.id}
                 value={c.id}
-                sx={{ color: c.color ?? "#000", fontWeight: 700 }}
+                sx={{
+                  mb: 0.8,
+                  borderRadius: "14px",
+                  px: 2,
+                  py: 1.2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  border: "2px solid transparent",
+                  "&.Mui-selected": {
+                    bgcolor: "rgba(0,0,0,0.06)",
+                    borderColor: c.color ?? "#999",
+                  },
+                  "&:hover": {
+                    bgcolor: "rgba(0,0,0,0.08)",
+                    transform: "scale(1.02)",
+                  },
+                }}
               >
-                {c.name}
+                <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: c.color ?? "#777" }} />
+
+                <ListItemText
+                  primary={c.name}
+                  primaryTypographyProps={{
+                    fontWeight: 800,
+                    fontSize: "0.8rem",
+                    letterSpacing: "0.6px",
+                    textTransform: "uppercase",
+                  }}
+                />
               </MenuItem>
             ))}
           </Select>
 
           <Button component="label" fullWidth startIcon={<PhotoIcon />} sx={{ mb: 2 }}>
             Cambiar foto portada
-            <input
-              hidden
-              type="file"
-              accept="image/*"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
+            <input hidden type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </Button>
 
           <Button startIcon={<PaletteIcon />} fullWidth sx={{ mb: 2 }}>
@@ -281,11 +313,7 @@ export default function CareersSection({
 
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button
-            onClick={handleSave}
-            disabled={!careerId || !file || !color || saving}
-            variant="contained"
-          >
+          <Button onClick={handleSave} disabled={!careerId || !file || !color || saving} variant="contained">
             Guardar
           </Button>
         </DialogActions>

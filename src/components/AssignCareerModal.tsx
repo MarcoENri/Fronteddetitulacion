@@ -1,13 +1,25 @@
-// src/components/AssignCareerModal.tsx
-import { Modal, Form, Select, Input, Switch, message } from "antd";
-import { useEffect, useMemo, useState } from "react";
-
-import type { UserOption, CareerOption } from "../services/adminLookupService";
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Box,
+  MenuItem,
+  FormControlLabel,
+  Switch,
+  IconButton,
+  Fade,
+  Typography
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { listUsersByRole, listCareers } from "../services/adminLookupService";
-
-import { assignByCareer } from "../services/adminAssignService"; // ✅ CAMBIO: antes assignCareer
-
+import { assignByCareer } from "../services/adminAssignService";
 import { useActivePeriod } from "../hooks/useActivePeriod";
+
+const VERDE_INSTITUCIONAL = "#008B8B";
 
 type CareerItem = {
   key: string;
@@ -19,178 +31,210 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  availableCareers: CareerItem[]; // solo para “bonito”, NO para enviar al backend
+  availableCareers: CareerItem[];
 };
 
-type FormValues = {
-  careerId: number; // ✅ ID real (Long)
-  coordinatorId: number;
-  tutorId?: number;
-  projectName?: string;
-  onlyUnassigned: boolean;
-};
-
-export default function AssignCareerModal({
-  open,
-  onClose,
-  onSuccess,
-  availableCareers,
-}: Props) {
-  const [form] = Form.useForm<FormValues>();
+export default function AssignCareerModal({ open, onClose, onSuccess, availableCareers }: Props) {
   const [loading, setLoading] = useState(false);
-
-  const [coordinators, setCoordinators] = useState<UserOption[]>([]);
-  const [tutors, setTutors] = useState<UserOption[]>([]);
-  const [careers, setCareers] = useState<CareerOption[]>([]);
-
   const activePeriod = useActivePeriod();
 
-  // prioridad “bonita” para que carreras de tus tarjetas aparezcan primero
-  const careerPriority = useMemo(() => {
-    return new Set((availableCareers ?? []).map((c) => c.key.toLowerCase().trim()));
-  }, [availableCareers]);
+  const [careers, setCareers] = useState<any[]>([]);
+  const [coordinators, setCoordinators] = useState<any[]>([]);
+  const [tutors, setTutors] = useState<any[]>([]);
+
+  const [formData, setFormData] = useState({
+    careerId: "",
+    coordinatorId: "",
+    tutorId: "",
+    projectName: "",
+    onlyUnassigned: true
+  });
 
   useEffect(() => {
-    if (!open) return;
+    if (open) {
+      (async () => {
+        try {
+          const [coords, tuts, cars] = await Promise.all([
+            listUsersByRole("COORDINATOR"),
+            listUsersByRole("TUTOR"),
+            listCareers(),
+          ]);
+          setCoordinators(coords);
+          setTutors(tuts);
+          setCareers(cars);
+        } catch (error) {
+          console.error("Error cargando datos del modal", error);
+        }
+      })();
+    }
+  }, [open]);
 
-    (async () => {
-      try {
-        const [coords, tuts, cars] = await Promise.all([
-          listUsersByRole("COORDINATOR"),
-          listUsersByRole("TUTOR"),
-          listCareers(),
-        ]);
+  const handleSave = async () => {
+    if (!activePeriod.periodId) return alert("No hay periodo activo");
+    if (!formData.careerId || !formData.coordinatorId) return alert("Carrera y Coordinador son obligatorios");
 
-        setCoordinators(coords);
-        setTutors(tuts);
-
-        const sorted = [...cars].sort((a, b) => {
-          const aKey = a.name.toLowerCase().trim();
-          const bKey = b.name.toLowerCase().trim();
-          const aP = careerPriority.has(aKey) ? 0 : 1;
-          const bP = careerPriority.has(bKey) ? 0 : 1;
-          if (aP !== bP) return aP - bP;
-          return a.name.localeCompare(b.name);
-        });
-
-        setCareers(sorted);
-
-        form.setFieldsValue({ onlyUnassigned: true });
-      } catch (e: any) {
-        message.error(e?.response?.data?.message ?? "No se pudo cargar datos");
-      }
-    })();
-  }, [open, form, careerPriority]);
-
-  const handleOk = async () => {
     try {
-      const values = await form.validateFields();
       setLoading(true);
-
-      // ✅ periodo activo obligatorio (para asignar por periodo)
-      if (!activePeriod.periodId) {
-        message.error(activePeriod.error ?? "No hay periodo activo. Activa uno primero.");
-        return;
-      }
-
       await assignByCareer({
-        careerId: values.careerId, // ✅ number
-        coordinatorId: values.coordinatorId,
-        tutorId: values.tutorId ?? null,
-        projectName: values.projectName?.trim() ? values.projectName.trim() : null,
-        onlyUnassigned: values.onlyUnassigned,
-        academicPeriodId: activePeriod.periodId, // ✅ clave
+        careerId: Number(formData.careerId),
+        coordinatorId: Number(formData.coordinatorId),
+        tutorId: formData.tutorId ? Number(formData.tutorId) : null,
+        projectName: formData.projectName.trim() || null,
+        onlyUnassigned: formData.onlyUnassigned,
+        academicPeriodId: activePeriod.periodId,
       });
-
-      message.success("Asignación masiva aplicada ✅");
       onSuccess();
       onClose();
-      form.resetFields();
+      setFormData({ careerId: "", coordinatorId: "", tutorId: "", projectName: "", onlyUnassigned: true });
     } catch (e: any) {
-      if (e?.errorFields) return;
-      message.error(e?.response?.data?.message ?? "Error en asignación masiva");
+      alert(e?.response?.data?.message ?? "Error en asignación masiva");
     } finally {
       setLoading(false);
     }
+  }
+
+  const inputStyle = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "12px",
+      "&.Mui-focused fieldset": {
+        borderColor: "#1976d2",
+        borderWidth: "2px",
+      },
+    },
+    "& .MuiInputLabel-root": {
+      fontWeight: 700,
+    },
   };
 
   return (
-    <Modal
-      title="Asignación masiva por carrera"
-      open={open}
-      onOk={handleOk}
-      okButtonProps={{ loading }}
-      onCancel={() => {
-        onClose();
-        form.resetFields();
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      TransitionComponent={Fade}
+      transitionDuration={400}
+      PaperProps={{ 
+        sx: { 
+          borderRadius: "20px",
+          padding: 1,
+          boxShadow: "0px 10px 40px rgba(0,0,0,0.15)"
+        } 
       }}
-      destroyOnClose
-      okText="OK"
-      cancelText="Cancelar"
+      maxWidth="xs"
+      fullWidth
     >
-      <Form layout="vertical" form={form}>
-        <Form.Item
-          label="Carrera"
-          name="careerId"
-          rules={[{ required: true, message: "Selecciona una carrera" }]}
-        >
-          <Select
-            showSearch
-            optionFilterProp="label"
-            options={careers.map((c) => ({
-              value: c.id,   // ✅ ID real
-              label: c.name, // 👁️ texto
-            }))}
-            placeholder="Selecciona carrera"
+      <DialogTitle sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        ASIGNACIÓN MASIVA
+        <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
+      </DialogTitle>
+      
+      <DialogContent sx={{ borderTop: 'none' }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 1 }}>
+          <TextField
+            select
+            label="Carrera"
+            fullWidth
+            size="small"
+            value={formData.careerId}
+            onChange={(e) => setFormData({...formData, careerId: e.target.value})}
+            sx={inputStyle}
+          >
+            {careers.map((c) => (
+              <MenuItem key={c.id} value={c.id} sx={{ fontWeight: 700 }}>
+                {c.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="Coordinador"
+            fullWidth
+            size="small"
+            value={formData.coordinatorId}
+            onChange={(e) => setFormData({...formData, coordinatorId: e.target.value})}
+            sx={inputStyle}
+          >
+            {coordinators.map((u) => (
+              <MenuItem key={u.id} value={u.id} sx={{ fontWeight: 700 }}>
+                {u.fullName} (@{u.username})
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="Tutor (opcional)"
+            fullWidth
+            size="small"
+            value={formData.tutorId}
+            onChange={(e) => setFormData({...formData, tutorId: e.target.value})}
+            sx={inputStyle}
+          >
+            <MenuItem value="" sx={{ fontWeight: 700 }}><em>Ninguno</em></MenuItem>
+            {tutors.map((u) => (
+              <MenuItem key={u.id} value={u.id} sx={{ fontWeight: 700 }}>
+                {u.fullName} (@{u.username})
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            label="Nombre del Proyecto (opcional)"
+            fullWidth
+            size="small"
+            value={formData.projectName}
+            onChange={(e) => setFormData({...formData, projectName: e.target.value})}
+            sx={inputStyle}
           />
-        </Form.Item>
 
-        <Form.Item
-          label="Coordinador"
-          name="coordinatorId"
-          rules={[{ required: true, message: "Selecciona un coordinador" }]}
-        >
-          <Select
-            showSearch
-            optionFilterProp="label"
-            options={coordinators.map((u) => ({
-              value: u.id,
-              label: `${u.fullName} (@${u.username})`,
-            }))}
-            placeholder="Selecciona coordinador"
+          <FormControlLabel
+            control={
+              <Switch 
+                checked={formData.onlyUnassigned} 
+                onChange={(e) => setFormData({...formData, onlyUnassigned: e.target.checked})} 
+                sx={{ 
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: VERDE_INSTITUCIONAL }, 
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: VERDE_INSTITUCIONAL } 
+                }}
+              />
+            }
+            label={<Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>Solo estudiantes no asignados</Typography>}
           />
-        </Form.Item>
+        </Box>
+      </DialogContent>
 
-        <Form.Item label="Tutor (opcional)" name="tutorId">
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            options={tutors.map((u) => ({
-              value: u.id,
-              label: `${u.fullName} (@${u.username})`,
-            }))}
-            placeholder="Selecciona tutor (opcional)"
-          />
-        </Form.Item>
-
-        <Form.Item label="Proyecto (opcional)" name="projectName">
-          <Input placeholder="Si lo llenas, se asigna a todos los estudiantes del filtro" />
-        </Form.Item>
-
-        <Form.Item
-          label="Solo estudiantes no asignados"
-          name="onlyUnassigned"
-          valuePropName="checked"
+      <DialogActions sx={{ p: 3, flexDirection: 'column', gap: 1 }}>
+        <Button 
+          variant="contained" 
+          fullWidth
+          onClick={handleSave}
+          disabled={loading}
+          sx={{ 
+            bgcolor: VERDE_INSTITUCIONAL, 
+            borderRadius: "50px", 
+            py: 1.2,
+            fontWeight: 800,
+            fontSize: '1rem',
+            transition: "all 0.2s ease-in-out",
+            "&:hover": { 
+              bgcolor: "#007272",
+              transform: "scale(1.05)" // EFECTO ZOOM
+            },
+            "&:active": {
+              transform: "scale(0.98)"
+            }
+          }}
         >
-          <Switch />
-        </Form.Item>
-
-        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
-          <b>Periodo activo:</b>{" "}
-          {activePeriod.loading ? "Cargando..." : activePeriod.periodName ?? "NO ACTIVO"}
-        </div>
-      </Form>
-    </Modal>
+          {loading ? "APLICANDO..." : "APLICAR ASIGNACIÓN"}
+        </Button>
+        <Button 
+          onClick={onClose} 
+          fullWidth
+          sx={{ color: "grey.500", fontWeight: 700, textTransform: 'none' }}
+        >
+          Cancelar
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

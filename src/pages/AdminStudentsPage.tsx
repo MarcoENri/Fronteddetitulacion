@@ -386,7 +386,6 @@ export default function AdminStudentsPage() {
               const base = `/admin/students/by-career?careerId=${careerId}&careerName=${encodeURIComponent(cName)}`;
               nav(pid ? `${base}&periodId=${pid}` : base);
             }}
-            onOpenAddCareer={() => setOpenAddCareer(true)}
             onGoPredefense={() => nav("/admin/predefense")}
             onGoFinalDefense={() => nav("/admin/final-defense")}
             onReloadCards={() => loadCareerCards(selectedPeriodId)}
