@@ -28,10 +28,12 @@ type Props = {
   verde: string;
   cards: CareerCardDto[];
   onCareerClick: (careerId: number) => void;
+  onOpenAddCareer?: () => void; // ✅ AÑADIR ESTO
   onGoPredefense: () => void;
   onGoFinalDefense: () => void;
-  onReloadCards: () => void;
+  onReloadCards: () => Promise<void>;
 };
+
 
 export default function CareersSection({
   verde,

@@ -81,7 +81,7 @@ export default function AssignStudentModal({ open, studentId, onClose, onSuccess
 
       <Form layout="vertical" form={form}>
         <Form.Item
-          label="Coordinador"
+          label="Docente"
           name="coordinatorId"
           rules={[{ required: true, message: "Selecciona un coordinador" }]}
         >

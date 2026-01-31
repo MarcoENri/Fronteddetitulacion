@@ -123,11 +123,22 @@ export default function StudentDetailPage() {
 
     try {
       const pid = await resolvePeriod();
-      // ✅ Si tu endpoint admin NO necesita periodId, déjalo así.
-      // Si quieres filtrar por periodo, puedes mandar params: { periodId: pid }
+      
+      // ✅ CRÍTICO: Si no hay periodo, mostramos advertencia
+      if (!pid) {
+        message.warning("No hay período académico activo. Las incidencias/observaciones requieren un período activo.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("🔍 Admin cargando estudiante con periodId:", pid); // ← Debug
+
+      // ✅ SIEMPRE mandamos el periodId como parámetro
       const res = await api.get<StudentDetailDto>(`/admin/students/${id}`, {
-        params: pid ? { periodId: pid } : undefined,
+        params: { periodId: pid },
       });
+
+      console.log("✅ Respuesta del backend:", res.data); // ← Debug
 
       const formattedData: StudentDetailDto = {
         ...res.data,
@@ -137,7 +148,7 @@ export default function StudentDetailPage() {
 
       setData(formattedData);
     } catch (e: any) {
-      console.error("Error al cargar:", e?.response?.data ?? e);
+      console.error("❌ Error al cargar:", e?.response?.data ?? e);
       message.error(e?.response?.data?.message ?? "No se pudo cargar el detalle del alumno");
 
       if (e?.response?.status === 401 || e?.response?.status === 403) {
