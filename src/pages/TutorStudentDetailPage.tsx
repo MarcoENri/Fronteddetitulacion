@@ -141,9 +141,32 @@ export default function TutorStudentDetailPage() {
 
     setLoading(true);
     try {
+      console.log("═══════════════════════════════════════");
+      console.log("🔍 TUTOR - Cargando estudiante");
+      console.log("   StudentId:", id);
+      console.log("   PeriodId:", periodId);
+      console.log("═══════════════════════════════════════");
+
       const res = await getTutorStudentDetail(id, periodId);
+      
+      console.log("✅ RESPUESTA DEL BACKEND (TUTOR):");
+      console.log("   - Datos básicos:", {
+        id: res.id,
+        nombre: `${res.firstName} ${res.lastName}`,
+        estado: res.status
+      });
+      console.log("   - Incidencias:", res.incidents?.length || 0, "encontradas");
+      console.log("   - Observaciones:", res.observations?.length || 0, "encontradas");
+      console.log("   - Incidencias RAW:", JSON.stringify(res.incidents, null, 2));
+      console.log("   - Observaciones RAW:", JSON.stringify(res.observations, null, 2));
+      console.log("═══════════════════════════════════════");
+
       setData(res);
     } catch (e: any) {
+      console.error("❌ ERROR AL CARGAR (TUTOR):");
+      console.error("   Status:", e?.response?.status);
+      console.error("   Data:", e?.response?.data);
+      console.error("   Full error:", e);
       alert(e?.response?.data?.message ?? "No se pudo cargar el estudiante");
       nav("/tutor", { replace: true });
     } finally {
@@ -234,98 +257,88 @@ export default function TutorStudentDetailPage() {
     }
   };
 
+  // Función para formatear fecha sin hora
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "-";
+    try {
+      // Si viene con hora (formato ISO), la cortamos
+      const dateOnly = dateString.split("T")[0];
+      const [year, month, day] = dateOnly.split("-");
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateString;
+    }
+  };
+
   if (!data) return null;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ minHeight: "100vh", background: "#f0f2f5", display: "flex", flexDirection: "column" }}>
-        {/* HEADER VERDE */}
+        {/* HEADER VERDE SUPERIOR - Elementos en las esquinas */}
         <Box
           sx={{
             bgcolor: VERDE_INSTITUCIONAL,
             color: "white",
             py: 2,
-            px: 4,
+            px: 2,
             boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
           }}
         >
-          <Container maxWidth="lg">
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 2,
-              }}
-            >
-              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                <Button
-                  variant="contained"
-                  startIcon={<ArrowBackIcon />}
-                  onClick={() => nav("/tutor")}
-                  sx={{
-                    bgcolor: "white",
-                    color: VERDE_INSTITUCIONAL,
-                    fontWeight: 900,
-                    "&:hover": { bgcolor: "#f5f5f5" },
-                    borderRadius: "20px",
-                    textTransform: "none",
-                  }}
-                >
-                  Volver
-                </Button>
-
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                    Panel de Tutoría
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Seguimiento del estudiante
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                <Button
-                  variant="contained"
-                  startIcon={<EmailIcon />}
-                  onClick={() => setEmailOpen(true)}
-                  sx={{
-                    bgcolor: "white",
-                    color: VERDE_INSTITUCIONAL,
-                    fontWeight: 900,
-                    "&:hover": { bgcolor: "#f5f5f5" },
-                    borderRadius: "20px",
-                    textTransform: "none",
-                  }}
-                >
-                  Enviar Correo
-                </Button>
-
-                <IconButton
-                  onClick={() => setDrawerOpen(true)}
-                  sx={{
-                    color: "white",
-                    "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-                  }}
-                >
-                  <Avatar
-                    src={photoPreview || undefined}
-                    sx={{
-                      width: 40,
-                      height: 40,
-                      bgcolor: "white",
-                      color: VERDE_INSTITUCIONAL,
-                      fontWeight: 900,
-                    }}
-                  >
-                    {tutorInfo?.name?.charAt(0) || tutorInfo?.username?.charAt(0)?.toUpperCase() || "U"}
-                  </Avatar>
-                </IconButton>
-              </Box>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              maxWidth: "100%",
+            }}
+          >
+            {/* ESQUINA IZQUIERDA: Panel de Tutoría */}
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                Panel de Tutoría
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                Seguimiento del estudiante
+              </Typography>
             </Box>
-          </Container>
+
+            {/* ESQUINA DERECHA: Botón Volver + Avatar */}
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+              <IconButton
+                onClick={() => nav("/tutor")}
+                sx={{
+                  color: "white",
+                  bgcolor: "rgba(255, 255, 255, 0.2)",
+                  "&:hover": { bgcolor: "rgba(255, 255, 255, 0.3)" },
+                }}
+              >
+                <ArrowBackIcon />
+              </IconButton>
+
+              <IconButton
+                onClick={() => setDrawerOpen(true)}
+                sx={{
+                  color: "white",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                  p: 0,
+                }}
+              >
+                <Avatar
+                  src={photoPreview || undefined}
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    bgcolor: "white",
+                    color: VERDE_INSTITUCIONAL,
+                    fontWeight: 900,
+                  }}
+                >
+                  {tutorInfo?.name?.charAt(0) || tutorInfo?.username?.charAt(0)?.toUpperCase() || "U"}
+                </Avatar>
+              </IconButton>
+            </Box>
+          </Box>
         </Box>
 
         {/* CONTENIDO PRINCIPAL */}
@@ -339,7 +352,7 @@ export default function TutorStudentDetailPage() {
                 overflow: "hidden",
               }}
             >
-              {/* BANNER DE IDENTIDAD */}
+              {/* BANNER DE IDENTIDAD CON BOTÓN ENVIAR CORREO */}
               <Box
                 sx={{
                   bgcolor: VERDE_INSTITUCIONAL,
@@ -347,37 +360,59 @@ export default function TutorStudentDetailPage() {
                   p: 3,
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "space-between",
                   gap: 2,
                 }}
               >
-                <Avatar
-                  sx={{
-                    width: 64,
-                    height: 64,
-                    bgcolor: "white",
-                    color: VERDE_INSTITUCIONAL,
-                    fontSize: "1.5rem",
-                    fontWeight: 900,
-                  }}
-                >
-                  {data.firstName?.charAt(0) || "?"}
-                </Avatar>
-                <Box>
-                  <Typography
-                    variant="caption"
+                {/* Izquierda: Avatar y nombre */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar
                     sx={{
-                      textTransform: "uppercase",
-                      fontWeight: 700,
-                      opacity: 0.8,
-                      letterSpacing: 1,
+                      width: 64,
+                      height: 64,
+                      bgcolor: "white",
+                      color: VERDE_INSTITUCIONAL,
+                      fontSize: "1.5rem",
+                      fontWeight: 900,
                     }}
                   >
-                    Seguimiento Académico
-                  </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 900 }}>
-                    {data.firstName} {data.lastName}
-                  </Typography>
+                    {data.firstName?.charAt(0) || "?"}
+                  </Avatar>
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        textTransform: "uppercase",
+                        fontWeight: 700,
+                        opacity: 0.8,
+                        letterSpacing: 1,
+                      }}
+                    >
+                      Seguimiento Académico
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 900 }}>
+                      {data.firstName} {data.lastName}
+                    </Typography>
+                  </Box>
                 </Box>
+
+                {/* Derecha: Botón Enviar Correo */}
+                <Button
+                  variant="contained"
+                  startIcon={<EmailIcon />}
+                  onClick={() => setEmailOpen(true)}
+                  sx={{
+                    bgcolor: "white",
+                    color: VERDE_INSTITUCIONAL,
+                    fontWeight: 900,
+                    "&:hover": { bgcolor: "#f5f5f5" },
+                    borderRadius: "20px",
+                    textTransform: "none",
+                    px: 3,
+                  }}
+                >
+                  Enviar Correo
+                </Button>
               </Box>
 
               <CardContent sx={{ p: 3 }}>
@@ -569,7 +604,7 @@ export default function TutorStudentDetailPage() {
                             data.incidents?.map((inc: any) => (
                               <TableRow key={inc.id} sx={{ "&:hover": { bgcolor: "#f5f5f5" } }}>
                                 <TableCell>{inc.stage}</TableCell>
-                                <TableCell>{inc.date}</TableCell>
+                                <TableCell>{formatDate(inc.date)}</TableCell>
                                 <TableCell>{inc.reason}</TableCell>
                                 <TableCell>{inc.action}</TableCell>
                                 <TableCell align="center">
@@ -656,7 +691,7 @@ export default function TutorStudentDetailPage() {
                               <TableRow key={obs.id} sx={{ "&:hover": { bgcolor: "#f5f5f5" } }}>
                                 <TableCell>{obs.author}</TableCell>
                                 <TableCell>{obs.text}</TableCell>
-                                <TableCell>{obs.createdAt}</TableCell>
+                                <TableCell>{formatDate(obs.createdAt)}</TableCell>
                               </TableRow>
                             ))
                           )}

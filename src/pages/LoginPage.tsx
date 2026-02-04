@@ -29,7 +29,6 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 // ============== ICONOS SOCIALES =========
 import { FaFacebookF, FaInstagram, FaWhatsapp, FaTiktok } from "react-icons/fa";
-import { FcGoogle } from "react-icons/fc";
 
 // ================= IMÁGENES ============
 import logoImg from "../assets/imagenes/LogoTec-Photoroom.png";
@@ -119,20 +118,13 @@ export default function LoginPage() {
       setResetMsg("Ingresa tu correo.");
       return;
     }
-    if (!resetEmail.includes("@")) {
-      setResetMsg("Correo inválido.");
-      return;
-    }
 
     setResetLoading(true);
     try {
       const res = await forgotPassword(resetEmail.trim());
-      // ✅ Para pruebas tu backend devuelve token
-      setResetToken(res.token ?? "");
-      setResetStep("reset");
-      setResetMsg(res.message ?? "Token generado.");
+      setResetMsg(res.message);
     } catch (e: any) {
-      setResetMsg(e?.response?.data?.message ?? "No se pudo generar el token.");
+      setResetMsg(e?.response?.data?.message ?? "Error al enviar correo.");
     } finally {
       setResetLoading(false);
     }
@@ -154,8 +146,7 @@ export default function LoginPage() {
     try {
       await resetPassword(resetToken.trim(), resetNewPass);
       setResetMsg("Contraseña actualizada ✅ Ya puedes iniciar sesión.");
-      // Opcional: cerrar modal luego de 1s (sin prometer, lo hacemos inmediato)
-      setOpenReset(false);
+      setTimeout(() => setOpenReset(false), 2000);
     } catch (e: any) {
       setResetMsg(e?.response?.data?.message ?? "No se pudo cambiar la contraseña.");
     } finally {
@@ -170,9 +161,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await api.post<LoginResponse>("/auth/login", values, {
-        headers: { "Content-Type": "application/json" },
-      });
+      const res = await api.post<LoginResponse>("/auth/login", values);
 
       const token = res.data.token;
       localStorage.setItem("token", token);
@@ -189,7 +178,6 @@ export default function LoginPage() {
         localStorage.removeItem("token");
       }
     } catch (err: any) {
-      console.error("Error en login:", err);
       localStorage.removeItem("token");
       setErrorMsg(err?.response?.data?.message ?? "Credenciales incorrectas");
     } finally {
@@ -285,17 +273,6 @@ export default function LoginPage() {
             </Typography>
 
             <Box component="form" onSubmit={onSubmit} sx={{ display: "grid", gap: 0.5 }}>
-              <Box sx={{ display: "flex", justifyContent: "flex-end", px: 1 }}>
-                <Link
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  sx={{ fontSize: "0.7rem", color: brand.primary, textDecoration: "none", fontWeight: 400 }}
-                >
-                  ¿Olvidaste tu usuario?
-                </Link>
-              </Box>
-
-              {/* ✅ Usuario o correo */}
               <TextField
                 placeholder="Usuario o correo"
                 required
@@ -338,7 +315,6 @@ export default function LoginPage() {
                 />
               </Box>
 
-              {/* ✅ Abre modal reset */}
               <Box sx={{ display: "flex", justifyContent: "flex-end", px: 1, mt: 0.5 }}>
                 <Link
                   href="#"
@@ -375,15 +351,33 @@ export default function LoginPage() {
                 {loading ? "Ingresando..." : "Ingresar"}
               </Button>
 
-              
-
               <Box sx={{ mt: 2, textAlign: "center" }}>
                 <Box sx={{ display: "flex", justifyContent: "center", gap: 1.5 }}>
-                  <Social icon={<FaFacebookF size={18} />} color="#1877F2" link="https://www.facebook.com/institutosudamericano/" />
-                  <Social icon={<FaInstagram size={18} />} color="#E4405F" link="https://www.instagram.com/itsudamericano" />
-                  <Social icon={<FaWhatsapp size={18} />} color="#25D366" link="https://api.whatsapp.com/send/?phone=593996976449" />
-                  <Social icon={<FaTiktok size={18} />} color="#000000" link="https://www.tiktok.com/@itsudamericano" />
-                  <Social icon={<LanguageRoundedIcon sx={{ fontSize: 22 }} />} color={brand.primary} link="https://sudamericano.edu.ec/" />
+                  <Social 
+                    icon={<FaFacebookF size={18} />} 
+                    color="#1877F2" 
+                    link="https://www.facebook.com/institutosudamericano/" 
+                  />
+                  <Social 
+                    icon={<FaInstagram size={18} />} 
+                    color="#E4405F" 
+                    link="https://www.instagram.com/itsudamericano?igsh=MWs3a2o5ZzVnbWFrZA==" 
+                  />
+                  <Social 
+                    icon={<FaWhatsapp size={18} />} 
+                    color="#25D366" 
+                    link="https://api.whatsapp.com/send/?phone=593996976449&text&app_absent=0" 
+                  />
+                  <Social 
+                    icon={<FaTiktok size={18} />} 
+                    color="#000000" 
+                    link="https://www.tiktok.com/@itsudamericano?lang=es" 
+                  />
+                  <Social 
+                    icon={<LanguageRoundedIcon sx={{ fontSize: 22 }} />} 
+                    color={brand.primary} 
+                    link="https://www.sudamericano.edu.ec/" 
+                  />
                 </Box>
               </Box>
             </Box>
@@ -393,26 +387,22 @@ export default function LoginPage() {
 
       {/* ================= MODAL RESET PASSWORD ================= */}
       <Dialog open={openReset} onClose={closeResetModal} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 900 }}>
-          Recuperar contraseña
-        </DialogTitle>
-
+        <DialogTitle sx={{ fontWeight: 900 }}>Recuperar contraseña</DialogTitle>
         <DialogContent dividers>
           {resetStep === "email" ? (
             <Box sx={{ display: "grid", gap: 1.2 }}>
               <Typography sx={{ fontSize: "0.85rem", color: "#444" }}>
-                Ingresa tu correo. Te generaremos un token para cambiar la contraseña.
+                Ingresa tu correo institucional para recibir las instrucciones de recuperación.
               </Typography>
-
               <TextField
                 label="Correo"
+                type="email"
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
                 fullWidth
               />
-
               {resetMsg && (
-                <Typography sx={{ fontSize: "0.8rem", color: resetMsg.includes("✅") ? "#2e7d32" : "#d32f2f" }}>
+                <Typography sx={{ fontSize: "0.8rem", color: resetMsg.includes("enviado") ? "#2e7d32" : "#d32f2f", mt: 1 }}>
                   {resetMsg}
                 </Typography>
               )}
@@ -420,16 +410,14 @@ export default function LoginPage() {
           ) : (
             <Box sx={{ display: "grid", gap: 1.2 }}>
               <Typography sx={{ fontSize: "0.85rem", color: "#444" }}>
-                Pega el token y escribe tu nueva contraseña.
+                Pega el token recibido en tu correo y define tu nueva clave.
               </Typography>
-
               <TextField
                 label="Token"
                 value={resetToken}
                 onChange={(e) => setResetToken(e.target.value)}
                 fullWidth
               />
-
               <TextField
                 label="Nueva contraseña"
                 type="password"
@@ -437,7 +425,6 @@ export default function LoginPage() {
                 onChange={(e) => setResetNewPass(e.target.value)}
                 fullWidth
               />
-
               {resetMsg && (
                 <Typography sx={{ fontSize: "0.8rem", color: resetMsg.includes("✅") ? "#2e7d32" : "#d32f2f" }}>
                   {resetMsg}
@@ -446,10 +433,8 @@ export default function LoginPage() {
             </Box>
           )}
         </DialogContent>
-
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={closeResetModal}>Cancelar</Button>
-
+          <Button onClick={closeResetModal}>Cerrar</Button>
           {resetStep === "email" ? (
             <Button
               variant="contained"
@@ -457,7 +442,7 @@ export default function LoginPage() {
               disabled={resetLoading}
               sx={{ bgcolor: brand.primary, fontWeight: 900 }}
             >
-              {resetLoading ? "Enviando..." : "Generar token"}
+              {resetLoading ? "Enviando..." : "Enviar correo"}
             </Button>
           ) : (
             <Button

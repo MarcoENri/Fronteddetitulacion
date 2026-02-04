@@ -4,7 +4,6 @@ import {
   Box,
   Container,
   Typography,
-  Button,
   Card,
   CardContent,
   Table,
@@ -22,6 +21,7 @@ import {
   Stack,
   Paper,
   Tooltip,
+  Button,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
@@ -53,31 +53,52 @@ export default function CoordinatorStudentsPage() {
 
   // ✅ Obtener datos REALES del usuario logueado desde localStorage
   const coordinatorInfo = useMemo(() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        return {
-          username: user.username || user.email?.split("@")[0] || "",
-          name: user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "",
-          email: user.email || "",
-          role: user.role || "Coordinador",
-        };
-      } catch {
-        return {
-          username: "",
-          name: "",
-          email: "",
-          role: "Coordinador",
-        };
+    console.log("🔍 Verificando localStorage...");
+    
+    // Intentar obtener de diferentes claves posibles
+    const possibleKeys = ["user", "currentUser", "userData", "authUser"];
+    let user = null;
+    
+    for (const key of possibleKeys) {
+      const userStr = localStorage.getItem(key);
+      console.log(`📦 localStorage.getItem("${key}"):`, userStr);
+      
+      if (userStr) {
+        try {
+          user = JSON.parse(userStr);
+          console.log(`✅ Usuario encontrado en "${key}":`, user);
+          break;
+        } catch (e) {
+          console.error(`❌ Error parseando "${key}":`, e);
+        }
       }
     }
-    return {
-      username: "",
-      name: "",
-      email: "",
-      role: "Coordinador",
+
+    if (!user) {
+      console.warn("⚠️ No se encontró usuario en localStorage");
+      return {
+        username: "",
+        name: "",
+        email: "",
+        role: "Coordinador",
+      };
+    }
+
+    // Intentar múltiples combinaciones de campos
+    const info = {
+      username: user.username || user.userName || user.user || user.email?.split("@")[0] || "",
+      name: user.name || 
+            user.fullName || 
+            user.displayName ||
+            (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}`.trim() : "") ||
+            (user.first_name && user.last_name ? `${user.first_name} ${user.last_name}`.trim() : "") ||
+            "",
+      email: user.email || user.correo || user.mail || "",
+      role: user.role || user.rol || user.type || user.userType || "Coordinador",
     };
+
+    console.log("📋 Información procesada:", info);
+    return info;
   }, []);
 
   const fallbackPeriodId = useMemo(() => {
@@ -152,6 +173,15 @@ export default function CoordinatorStudentsPage() {
     if (savedPhoto) {
       setPhotoPreview(savedPhoto);
     }
+
+    // 🔍 DEBUG: Mostrar todo el localStorage
+    console.log("🗄️ TODO el localStorage:");
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        console.log(`  ${key}:`, localStorage.getItem(key));
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -164,11 +194,27 @@ export default function CoordinatorStudentsPage() {
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validar tipo de archivo
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor selecciona un archivo de imagen válido');
+        return;
+      }
+
+      // Validar tamaño (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('La imagen es demasiado grande. Por favor selecciona una imagen menor a 5MB');
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         const photoData = reader.result as string;
         setPhotoPreview(photoData);
         localStorage.setItem("coordinatorPhoto", photoData);
+        console.log("✅ Foto guardada en localStorage");
+      };
+      reader.onerror = () => {
+        alert('Error al cargar la imagen. Por favor intenta de nuevo.');
       };
       reader.readAsDataURL(file);
     }
@@ -180,65 +226,93 @@ export default function CoordinatorStudentsPage() {
     return "success";
   };
 
+  // Obtener el nombre para mostrar en el tooltip
+  const getDisplayName = () => {
+    if (coordinatorInfo?.name) return coordinatorInfo.name;
+    if (coordinatorInfo?.username) return coordinatorInfo.username;
+    return "Usuario";
+  };
+
+  // Obtener iniciales del usuario
+  const getInitials = () => {
+    if (coordinatorInfo?.name) {
+      const parts = coordinatorInfo.name.split(" ");
+      if (parts.length >= 2) {
+        return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+      }
+      return coordinatorInfo.name.charAt(0).toUpperCase();
+    }
+    if (coordinatorInfo?.username) {
+      return coordinatorInfo.username.charAt(0).toUpperCase();
+    }
+    return "U";
+  };
+
   return (
     <Box sx={{ minHeight: "100vh", background: "#f0f2f5", display: "flex", flexDirection: "column" }}>
-      {/* HEADER VERDE */}
+      {/* HEADER VERDE - Elementos en las esquinas */}
       <Box
         sx={{
           bgcolor: VERDE_INSTITUCIONAL,
           color: "white",
           py: 2,
-          px: 4,
+          px: 2,
           boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
         }}
       >
-        <Container maxWidth="lg">
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: 2,
-            }}
-          >
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                Mis Estudiantes
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                Listado general de estudiantes {periodId ? `— Periodo: ${periodId}` : ""}
-              </Typography>
-            </Box>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            maxWidth: "100%",
+          }}
+        >
+          {/* ESQUINA IZQUIERDA: Título */}
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+              Mis Estudiantes
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+              Listado general {periodId ? `— Periodo: ${periodId}` : ""}
+            </Typography>
+          </Box>
 
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-              <Button
-                variant="contained"
-                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+          {/* ESQUINA DERECHA: Botón Refrescar + Avatar */}
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <Tooltip title="Recargar página" arrow>
+              <IconButton
                 onClick={load}
                 disabled={loading}
                 sx={{
-                  bgcolor: "white",
-                  color: VERDE_INSTITUCIONAL,
-                  fontWeight: 900,
-                  "&:hover": {
-                    bgcolor: "#f5f5f5",
+                  color: "white",
+                  bgcolor: "rgba(255, 255, 255, 0.2)",
+                  "&:hover": { bgcolor: "rgba(255, 255, 255, 0.3)" },
+                  "&:disabled": { 
+                    bgcolor: "rgba(255, 255, 255, 0.1)",
+                    color: "rgba(255, 255, 255, 0.5)",
                   },
-                  borderRadius: "20px",
-                  textTransform: "none",
                 }}
               >
-                Refrescar
-              </Button>
+                {loading ? (
+                  <CircularProgress size={24} sx={{ color: "white" }} />
+                ) : (
+                  <RefreshIcon />
+                )}
+              </IconButton>
+            </Tooltip>
 
-              {/* Botón de Perfil del Coordinador */}
+            <Tooltip 
+              title={`Perfil de ${getDisplayName()}`} 
+              arrow
+              placement="bottom"
+            >
               <IconButton
                 onClick={() => setDrawerOpen(true)}
                 sx={{
                   color: "white",
-                  "&:hover": {
-                    bgcolor: "rgba(255,255,255,0.1)",
-                  },
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                  p: 0,
                 }}
               >
                 <Avatar
@@ -249,14 +323,20 @@ export default function CoordinatorStudentsPage() {
                     bgcolor: "white",
                     color: VERDE_INSTITUCIONAL,
                     fontWeight: 900,
+                    border: "2px solid rgba(255,255,255,0.3)",
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      transform: "scale(1.05)",
+                      border: "2px solid white",
+                    },
                   }}
                 >
-                  {coordinatorInfo?.name?.charAt(0) || coordinatorInfo?.username?.charAt(0)?.toUpperCase() || "U"}
+                  {getInitials()}
                 </Avatar>
               </IconButton>
-            </Box>
+            </Tooltip>
           </Box>
-        </Container>
+        </Box>
       </Box>
 
       {/* CONTENIDO PRINCIPAL */}
@@ -293,7 +373,7 @@ export default function CoordinatorStudentsPage() {
                             textAlign: "center",
                           }}
                         >
-                          Foto
+                          Inicial
                         </TableCell>
                         <TableCell
                           sx={{
@@ -440,7 +520,7 @@ export default function CoordinatorStudentsPage() {
           textAlign: "center",
         }}
       >
-        <Typography variant="body2">© 2025 - Panel de Predefensas</Typography>
+        <Typography variant="body2">© 2025 - Panel de Coordinador</Typography>
       </Box>
 
       {/* DRAWER LATERAL - NO TAPA EL FOOTER */}
@@ -453,8 +533,7 @@ export default function CoordinatorStudentsPage() {
             width: { xs: "100%", sm: 360 },
             bgcolor: "rgba(255, 255, 255, 0.98)",
             backdropFilter: "blur(10px)",
-            // ✅ CLAVE: No llega hasta abajo, deja espacio para el footer
-            height: "calc(100vh - 56px)", // 56px es la altura del footer
+            height: "calc(100vh - 56px)",
             top: 0,
           },
         }}
@@ -506,20 +585,29 @@ export default function CoordinatorStudentsPage() {
           {/* Contenido del Perfil */}
           <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
             <Box sx={{ textAlign: "center", mb: 2.5 }}>
-              <Avatar
-                src={photoPreview || undefined}
-                sx={{
-                  width: 90,
-                  height: 90,
-                  fontSize: "2.2rem",
-                  mx: "auto",
-                  mb: 1.5,
-                  bgcolor: VERDE_INSTITUCIONAL,
-                  border: "3px solid #f0f2f5",
-                }}
-              >
-                {coordinatorInfo?.name?.charAt(0) || coordinatorInfo?.username?.charAt(0)?.toUpperCase() || "U"}
-              </Avatar>
+              <Box sx={{ position: "relative", display: "inline-block" }}>
+                <Avatar
+                  src={photoPreview || undefined}
+                  sx={{
+                    width: 90,
+                    height: 90,
+                    fontSize: "2.2rem",
+                    mx: "auto",
+                    mb: 1.5,
+                    bgcolor: VERDE_INSTITUCIONAL,
+                    border: "3px solid #f0f2f5",
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      transform: "scale(1.05)",
+                      border: `3px solid ${VERDE_INSTITUCIONAL}`,
+                    },
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {getInitials()}
+                </Avatar>
+              </Box>
 
               <Typography variant="h6" sx={{ fontWeight: 900, mb: 0.5, fontSize: "1rem" }}>
                 {coordinatorInfo?.name || coordinatorInfo?.username || "Usuario"}
@@ -529,7 +617,7 @@ export default function CoordinatorStudentsPage() {
                 type="file"
                 ref={fileInputRef}
                 onChange={handlePhotoChange}
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
                 style={{ display: "none" }}
               />
 

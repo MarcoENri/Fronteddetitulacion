@@ -34,17 +34,11 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { renderTimeViewClock } from '@mui/x-date-pickers/timeViewRenderers';
 import dayjs, { Dayjs } from "dayjs";
-import "dayjs/locale/es";
-import updateLocale from 'dayjs/plugin/updateLocale';
+import "dayjs/locale/en";
 
-// Configurar locale español
-dayjs.extend(updateLocale);
-dayjs.locale("es");
+// Configurar locale inglés
+dayjs.locale("en");
 
-// Personalizar abreviaciones de días de la semana
-dayjs.updateLocale('es', {
-  weekdaysMin: ['D', 'L', 'M', 'X', 'J', 'V', 'S']
-});
 import { listCareers } from "../services/careerService";
 import type { CareerDto } from "../services/careerService";
 
@@ -394,7 +388,7 @@ export default function FinalDefenseAdminPage() {
               </Typography>
               
               <Paper elevation={0} sx={{ p: 4, borderRadius: "25px", border: "1px solid #e1e8ed", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" }}>
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en">
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     
                     <DateTimePicker
@@ -615,8 +609,8 @@ export default function FinalDefenseAdminPage() {
         </Container>
       </Fade>
 
-            {/* MODAL GESTIONAR VENTANA */}
-            <Dialog 
+      {/* MODAL GESTIONAR VENTANA */}
+      <Dialog 
         open={openManage} 
         onClose={() => setOpenManage(false)} 
         maxWidth="md"
@@ -629,20 +623,20 @@ export default function FinalDefenseAdminPage() {
           }
         }}
       >
-     <DialogTitle sx={{ 
-  fontWeight: 900, 
-  color: VERDE_INSTITUCIONAL, 
-  borderBottom: "1px solid #f1f2f6",
-  py: 1.5,
-  px: 3
-}}>
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-    <AssignmentTurnedInRoundedIcon sx={{ fontSize: 20 }} />
-    <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
-      Gestionar Ventana {activeWindow ? `#${activeWindow.id}` : ""}
-    </Typography>
-  </Box>
-</DialogTitle>
+        <DialogTitle sx={{ 
+          fontWeight: 900, 
+          color: VERDE_INSTITUCIONAL, 
+          borderBottom: "1px solid #f1f2f6",
+          py: 1.5,
+          px: 3
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AssignmentTurnedInRoundedIcon sx={{ fontSize: 20 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
+              Gestionar Ventana {activeWindow ? `#${activeWindow.id}` : ""}
+            </Typography>
+          </Box>
+        </DialogTitle>
 
         <DialogContent dividers sx={{ p: 3 }}>
           {!activeWindow ? (
@@ -718,49 +712,49 @@ export default function FinalDefenseAdminPage() {
                   <Typography sx={{ fontWeight: 900 }}>Crear Slot de Tiempo</Typography>
                 </Box>
 
-               <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-                <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                  <DateTimePicker
-                    label="Inicio del Slot"
-                    value={slotStart}
-                    onChange={(v) => setSlotStart(v)}
-                    ampm={false}
-                    viewRenderers={{ hours: renderTimeViewClock, minutes: renderTimeViewClock }}
-                    slotProps={{ 
-                      textField: { size: "small", sx: { width: 250, ...premiumInputStyle } },
-                      popper: { sx: { ...cleanPopperStyle, zIndex: 1400 } }
-                    }}
-                  />
-                  <DateTimePicker
-                    label="Fin del Slot"
-                    value={slotEnd}
-                    onChange={(v) => setSlotEnd(v)}
-                    ampm={false}
-                    viewRenderers={{ hours: renderTimeViewClock, minutes: renderTimeViewClock }}
-                    slotProps={{ 
-                      textField: { size: "small", sx: { width: 250, ...premiumInputStyle } },
-                      popper: { sx: { ...cleanPopperStyle, zIndex: 1400 } }
-                    }}
-                  />
-                </Box>
-              </LocalizationProvider>
+                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+                  <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                    <DateTimePicker
+                      label="Inicio del Slot"
+                      value={slotStart}
+                      onChange={(v) => setSlotStart(v)}
+                      ampm={false}
+                      viewRenderers={{ hours: renderTimeViewClock, minutes: renderTimeViewClock }}
+                      slotProps={{ 
+                        textField: { size: "small", sx: { width: 250, ...premiumInputStyle } },
+                        popper: { sx: { ...cleanPopperStyle, zIndex: 1400 } }
+                      }}
+                    />
+                    <DateTimePicker
+                      label="Fin del Slot"
+                      value={slotEnd}
+                      onChange={(v) => setSlotEnd(v)}
+                      ampm={false}
+                      viewRenderers={{ hours: renderTimeViewClock, minutes: renderTimeViewClock }}
+                      slotProps={{ 
+                        textField: { size: "small", sx: { width: 250, ...premiumInputStyle } },
+                        popper: { sx: { ...cleanPopperStyle, zIndex: 1400 } }
+                      }}
+                    />
+                  </Box>
+                </LocalizationProvider>
 
-              <Button
-                onClick={handleCreateSlot}
-                disabled={loading}
-                variant="contained"
-                sx={{ 
-                  bgcolor: VERDE_INSTITUCIONAL, 
-                  fontWeight: 900,
-                  borderRadius: "50px",
-                  px: 6,
-                  maxWidth: 400,
-                  mx: 'auto',
-                  display: 'block'
-                }}
-              >
-                Crear Slot
-              </Button>
+                <Button
+                  onClick={handleCreateSlot}
+                  disabled={loading}
+                  variant="contained"
+                  sx={{ 
+                    bgcolor: VERDE_INSTITUCIONAL, 
+                    fontWeight: 900,
+                    borderRadius: "50px",
+                    px: 6,
+                    maxWidth: 400,
+                    mx: 'auto',
+                    display: 'block'
+                  }}
+                >
+                  Crear Slot
+                </Button>
               </Paper>
 
               {/* CREAR BOOKING */}
@@ -929,13 +923,12 @@ export default function FinalDefenseAdminPage() {
                   </Typography>
                 )}
 
-                        <JuriesSelector
+                {/* JURADOS - COMPONENTE SIMPLIFICADO */}
+                <JuriesSelector
                   juries={juries}
-                  careers={careers}  // ⬅️ AGREGAR ESTA LÍNEA
                   selectedJuryIds={selectedJuryIds}
                   toggleJury={toggleJury}
                 />
-
 
                 <Button
                   onClick={handleCreateBooking}

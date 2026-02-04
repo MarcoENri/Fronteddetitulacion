@@ -5,6 +5,7 @@ import { api } from "./api/api";
 
 // Pages
 import LoginPage from "./pages/LoginPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage"; // ✅ Importado
 import AdminStudentsPage from "./pages/AdminStudentsPage";
 import AdminStudentsByCareerPage from "./pages/AdminStudentsByCareerPage";
 import StudentDetailPage from "./pages/StudentDetailPage";
@@ -17,7 +18,7 @@ import TutorStudentDetailPage from "./pages/TutorStudentDetailPage";
 import AdminPredefensePage from "./pages/AdminPredefensePage";
 import JuryPredefensePage from "./pages/JuryPredefensePage";
 
-// ✅ DEFENSA FINAL (NUEVO)
+// ✅ DEFENSA FINAL
 import FinalDefenseAdminPage from "./pages/FinalDefenseAdminPage";
 import FinalDefenseJuryPage from "./pages/FinalDefenseJuryPage";
 
@@ -94,8 +95,6 @@ function HomeRedirect() {
   if (roles.includes("ROLE_ADMIN")) return <Navigate to="/admin" replace />;
   if (roles.includes("ROLE_COORDINATOR")) return <Navigate to="/coordinator" replace />;
   if (roles.includes("ROLE_TUTOR")) return <Navigate to="/tutor" replace />;
-  
-  // ✅ Redirección para JURY (Por defecto va a predefensa, luego navegan por menú)
   if (roles.includes("ROLE_JURY")) return <Navigate to="/jury/predefense" replace />;
 
   localStorage.clear();
@@ -107,6 +106,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
+        
+        {/* ✅ RUTA PÚBLICA PARA RECUPERAR CONTRASEÑA */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* --- RUTAS DE ADMIN --- */}
         <Route
@@ -118,8 +120,6 @@ export default function App() {
           }
         />
         
-        {/* ✅ CORREGIDO: Ruta para estudiantes por carrera usando Query Params */}
-        {/* Antes era /admin/students/career/:careerName, ahora es /admin/students/by-career */}
         <Route
           path="/admin/students/by-career"
           element={
@@ -137,7 +137,7 @@ export default function App() {
             </RequireRole>
           }
         />
-        {/* Predefensa Admin */}
+
         <Route
           path="/admin/predefense"
           element={
@@ -146,7 +146,7 @@ export default function App() {
             </RequireRole>
           }
         />
-        {/* ✅ DEFENSA FINAL ADMIN */}
+
         <Route
           path="/admin/final-defense"
           element={
@@ -193,7 +193,6 @@ export default function App() {
         />
 
         {/* --- RUTAS DE JURADO --- */}
-        {/* Predefensa Jurado */}
         <Route
           path="/jury/predefense"
           element={
@@ -202,7 +201,6 @@ export default function App() {
             </RequireRole>
           }
         />
-        {/* ✅ DEFENSA FINAL JURADO */}
         <Route 
           path="/jury/final-defense" 
           element={

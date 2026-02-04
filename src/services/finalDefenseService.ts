@@ -12,7 +12,7 @@ export type FinalDefenseWindowDto = {
   endsAt: string;
   isActive: boolean;
   
-  hasRubric?: boolean; // ✅ NUEVO: Indica si ya se subió un PDF
+  hasRubric?: boolean; // ✅ Indica si ya se subió un PDF
 };
 
 export type FinalDefenseSlotDto = {
@@ -103,14 +103,17 @@ export type CreateFinalDefenseEvaluationRequest = {
   observations?: string | null;
 };
 
-// Para /admin/users?role=ROLE_JURY
+// Para usuarios que serán jurados (tutores y coordinadores)
 export type JuryUserDto = {
   id: number;
   username: string;
   fullName: string;
   email: string;
+  dni?: string;
   enabled?: boolean;
   roles: string[];
+  careerId?: number;
+  careerName?: string;
 };
 
 // ================== ADMIN ==================
@@ -157,9 +160,45 @@ export async function adminFinalListStudentsByCareer(careerId: number, periodId?
   return res.data ?? [];
 }
 
+// ✅ MODIFICADO: Obtener tutores y coordinadores en lugar de solo ROLE_JURY
 export async function adminFinalListJuries(): Promise<JuryUserDto[]> {
-  const res = await api.get<JuryUserDto[]>("/admin/users", { params: { role: "ROLE_JURY" } });
-  return res.data ?? [];
+  try {
+    // Hacer 2 peticiones: una para ROLE_TUTOR y otra para ROLE_DOCENTE
+    const [tutorsRes, coordinatorsRes] = await Promise.all([
+      api.get<JuryUserDto[]>("/admin/users", { params: { role: "ROLE_TUTOR" } }),
+      api.get<JuryUserDto[]>("/admin/users", { params: { role: "ROLE_DOCENTE" } })
+    ]);
+
+    const tutors = tutorsRes.data ?? [];
+    const coordinators = coordinatorsRes.data ?? [];
+
+    console.log("🎓 Tutores recibidos:", tutors.length);
+    console.log("👔 Coordinadores recibidos:", coordinators.length);
+
+    // Combinar ambos arrays
+    const combined = [...tutors, ...coordinators];
+
+    // Eliminar duplicados por ID (si alguien es TUTOR Y COORDINADOR)
+    const uniqueJuries = combined.reduce((acc, current) => {
+      const existing = acc.find(item => item.id === current.id);
+      
+      if (existing) {
+        // Si ya existe, combinar los roles
+        existing.roles = [...new Set([...(existing.roles || []), ...(current.roles || [])])];
+      } else {
+        acc.push({ ...current });
+      }
+      
+      return acc;
+    }, [] as JuryUserDto[]);
+
+    console.log("✅ Total de jurados únicos:", uniqueJuries.length);
+
+    return uniqueJuries;
+  } catch (error) {
+    console.error("❌ Error al obtener jurados:", error);
+    return [];
+  }
 }
 
 export async function adminFinalCreateBooking(body: CreateFinalDefenseBookingRequest): Promise<FinalDefenseBookingDto> {
@@ -198,11 +237,9 @@ export async function juryFinalDownloadActaPdf(bookingId: number): Promise<Blob>
 }
 
 // ✅ JURY: Descargar rúbrica
-// ✅ JURY: Descargar rúbrica
 export async function juryFinalDownloadRubricPdf(bookingId: number): Promise<Blob> {
   const res = await api.get(`/jury/final-defense/bookings/${bookingId}/rubric.pdf`, {
     responseType: "blob",
   });
   return res.data as Blob;
 }
-

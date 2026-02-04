@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -24,18 +24,23 @@ import type { AdminStudentRow } from "../services/adminStudentService";
 
 type Props = {
   verde: string;
-
   careerCards: CareerCardDto[];
   groupedStudents: Record<number, AdminStudentRow[]>;
-
   searchTerm: string;
   setSearchTerm: (v: string) => void;
-
   getStudentName: (s: any) => string;
-  getSemaforo: (s: any) => { bg: string; border: string; chipBg: string; chipText: string; label: string };
-
+  getSemaforo: (s: any) => {
+    bg: string;
+    border: string;
+    chipBg: string;
+    chipText: string;
+    label: string;
+  };
   onViewProfile: (id: any) => void;
   onClearIncidents: (id: number) => void;
+
+  // 👉 backend luego implementa esto
+  onMarkIncidentsSeen?: (id: number) => void;
 };
 
 export default function GeneralListSection({
@@ -48,7 +53,10 @@ export default function GeneralListSection({
   getSemaforo,
   onViewProfile,
   onClearIncidents,
+  onMarkIncidentsSeen,
 }: Props) {
+  const [seenCareers, setSeenCareers] = useState<number[]>([]);
+
   return (
     <>
       <Box sx={{ width: "100%", maxWidth: "1100px", mb: 2 }}>
@@ -65,31 +73,28 @@ export default function GeneralListSection({
             minHeight: 58,
           }}
         >
-          <Box sx={{ display: "flex", flexDirection: "column" }}>
-            <Typography sx={{ fontWeight: 600, color: verde, lineHeight: 1 }}>
-              Lista General
-            </Typography>
-
-            {searchTerm.trim() && (
-              <Typography sx={{ fontSize: "0.75rem", color: "#777", fontWeight: 500, mt: 0.4 }}>
-                Resultados filtrados por búsqueda
-              </Typography>
-            )}
-          </Box>
+          <Typography sx={{ fontWeight: 600, color: verde }}>
+            Lista General
+          </Typography>
 
           <TextField
             placeholder="Nombre, apellido o cédula"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             size="small"
-            sx={{ width: 340, maxWidth: "100%" }}
+            sx={{ width: 340 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
                   <SearchRoundedIcon sx={{ color: verde }} />
                 </InputAdornment>
               ),
-              sx: { borderRadius: "999px", bgcolor: "#fff", height: 34, fontSize: "0.85rem" },
+              sx: {
+                borderRadius: "999px",
+                bgcolor: "#fff",
+                height: 34,
+                fontSize: "0.85rem",
+              },
             }}
           />
         </Card>
@@ -98,7 +103,13 @@ export default function GeneralListSection({
       <Box sx={{ width: "100%", maxWidth: "1100px" }}>
         {careerCards.map((career) => {
           const students = groupedStudents[career.id] || [];
+
           if (searchTerm.trim() && students.length === 0) return null;
+
+          // 👉 SOLO incidencias NO LEÍDAS generan pastel
+          const careerAlerts = students.filter(
+            (s: any) => s.hasUnreadIncidents
+          ).length;
 
           return (
             <Accordion
@@ -108,11 +119,20 @@ export default function GeneralListSection({
                 borderRadius: "15px !important",
                 borderLeft: `8px solid ${career.color ?? "#90a4ae"}`,
                 boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                bgcolor: careerAlerts > 0 ? `${career.color}22` : "#fff",
               }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between", pr: 2 }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: "0.95rem" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    width: "100%",
+                    justifyContent: "space-between",
+                    pr: 2,
+                  }}
+                >
+                  <Typography sx={{ fontWeight: 700 }}>
                     {career.name}
                   </Typography>
 
@@ -127,83 +147,91 @@ export default function GeneralListSection({
 
               <AccordionDetails sx={{ p: 0 }}>
                 <List sx={{ bgcolor: "#fafafa" }}>
-                  {students.length > 0 ? (
-                    students.map((s: any, idx) => {
-                      const sem = getSemaforo(s);
-                      const dni = s.dni ?? s.cedula ?? "-";
+                  {students.map((s: any, idx) => {
+                    const sem = getSemaforo(s);
+                    const dni = s.dni ?? s.cedula ?? "-";
 
-                      return (
-                        <Box key={s.id || idx}>
-                          <ListItem sx={{ py: 1.5, px: 4, bgcolor: sem.bg, borderLeft: `6px solid ${sem.border}` }}>
-                            <ListItemText
-                              primary={
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
-                                  <Typography sx={{ fontWeight: 700 }}>{getStudentName(s)}</Typography>
-                                  <Box
-                                    sx={{
-                                      bgcolor: sem.chipBg,
-                                      color: sem.chipText,
-                                      px: 1,
-                                      borderRadius: "6px",
-                                      fontSize: "0.65rem",
-                                      fontWeight: 800,
-                                    }}
-                                  >
-                                    {sem.label}
-                                  </Box>
+                    const incidents = s.incidentCount ?? 0;
+                    const observations = s.observationCount ?? 0;
+
+                    let nameColor = "inherit";
+                    if (incidents === 1) nameColor = "#fbc02d";
+                    if (incidents === 2) nameColor = "#f57c00";
+                    if (incidents >= 3) nameColor = "#d32f2f";
+
+                    const isFailed = incidents >= 3;
+
+                    return (
+                      <Box key={s.id || idx}>
+                        <ListItem
+                          onClick={() => {
+                            onViewProfile(s.id);
+
+                            // 👉 marca leído en backend
+                            onMarkIncidentsSeen?.(Number(s.id));
+                          }}
+                          sx={{
+                            cursor: "pointer",
+                            "&:hover": { bgcolor: "#eee" },
+                            py: 1.5,
+                            px: 4,
+                            bgcolor: sem.bg,
+                            borderLeft: `6px solid ${sem.border}`,
+                          }}
+                        >
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                                <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+                                  <Typography sx={{ fontWeight: 700, color: nameColor }}>
+                                    {getStudentName(s)}
+                                  </Typography>
+
+                                  {incidents === 0 && observations === 0 && (
+                                    <Box sx={{ bgcolor: sem.chipBg, color: sem.chipText, px: 1.2, borderRadius: "999px", fontSize: 11 }}>
+                                      SIN NOVEDAD
+                                    </Box>
+                                  )}
+
+                                  {incidents > 0 && (
+                                    <Box sx={{ bgcolor: career.color, color: "#fff", px: 1.2, borderRadius: "999px", fontSize: 11 }}>
+                                      INCIDENCIAS: {incidents}
+                                    </Box>
+                                  )}
+
+                                  {observations > 0 && (
+                                    <Box sx={{ bgcolor: "#1976d2", color: "#fff", px: 1.2, borderRadius: "999px", fontSize: 11 }}>
+                                      OBSERVACIONES: {observations}
+                                    </Box>
+                                  )}
+
+                                  {isFailed && (
+                                    <Box sx={{ bgcolor: "#d32f2f", color: "#fff", px: 1.2, borderRadius: "999px", fontSize: 11 }}>
+                                      REPROBADO
+                                    </Box>
+                                  )}
                                 </Box>
-                              }
-                              secondary={
-                                <Typography sx={{ fontSize: "0.8rem", color: "#666", fontWeight: 600 }}>
-                                  DNI: {dni}
-                                </Typography>
-                              }
-                            />
+                              </Box>
+                            }
+                            secondary={`DNI: ${dni}`}
+                          />
 
-                            <Box sx={{ display: "flex", gap: 1 }}>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => onViewProfile(s.id)}
-                                sx={{
-                                  borderRadius: "20px",
-                                  color: career.color ?? verde,
-                                  borderColor: career.color ?? verde,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                Ver perfil
-                              </Button>
+                          <Button
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClearIncidents(Number(s.id));
+                            }}
+                            startIcon={<DeleteSweepRoundedIcon />}
+                          >
+                            Limpiar
+                          </Button>
+                        </ListItem>
 
-                              <Button
-                                size="small"
-                                variant="contained"
-                                startIcon={<DeleteSweepRoundedIcon />}
-                                onClick={() => onClearIncidents(Number(s.id))}
-                                sx={{
-                                  borderRadius: "20px",
-                                  bgcolor: "#fff",
-                                  color: "#555",
-                                  fontWeight: 700,
-                                  border: "1px solid #ddd",
-                                  boxShadow: "none",
-                                  "&:hover": { bgcolor: "#f5f5f5" },
-                                }}
-                              >
-                                Limpiar
-                              </Button>
-                            </Box>
-                          </ListItem>
-
-                          {idx < students.length - 1 && <Divider />}
-                        </Box>
-                      );
-                    })
-                  ) : (
-                    <Typography sx={{ p: 3, textAlign: "center", color: "#999" }}>
-                      No hay estudiantes registrados
-                    </Typography>
-                  )}
+                        {idx < students.length - 1 && <Divider />}
+                      </Box>
+                    );
+                  })}
                 </List>
               </AccordionDetails>
             </Accordion>

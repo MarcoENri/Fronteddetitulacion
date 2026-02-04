@@ -79,7 +79,6 @@ export default function AdminPredefensePage() {
     } finally { setLoading(false); }
   };
 
-  // CORRECCIÓN: ESTILO BLANCO Y LIMPIO PARA EL CALENDARIO (IGUAL AL DE DEFENSAS)
   const cleanPopperStyle = {
     "& .MuiPaper-root": {
       bgcolor: "#fff",
@@ -87,16 +86,69 @@ export default function AdminPredefensePage() {
       borderRadius: "20px",
       boxShadow: "0 15px 45px rgba(0,0,0,0.15)",
       border: "1px solid #eee",
-      "& .MuiTypography-root, & .MuiButtonBase-root": { color: "#444", fontWeight: 700 },
-      "& .MuiPickersDay-root": {
-        "&.Mui-selected": { bgcolor: VERDE_INSTITUCIONAL, color: "#fff", "&:hover": { bgcolor: VERDE_INSTITUCIONAL } },
-        "&.MuiPickersDay-today": { borderColor: VERDE_INSTITUCIONAL },
+
+      // ✅ FIX: Configuración correcta del header de días
+      "& .MuiDayCalendar-header": {
+        display: "flex",
+        justifyContent: "space-between",
+        paddingLeft: "8px",
+        paddingRight: "8px",
+        marginBottom: "8px",
+
+        "& .MuiDayCalendar-weekDayLabel": {
+          width: "36px",
+          height: "36px",
+          margin: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontWeight: 800,
+          fontSize: "0.75rem",
+          textTransform: "uppercase",
+          color: "#444",
+        }
       },
+
+      // ✅ Asegurar que los días también tengan el tamaño correcto
+      "& .MuiDayCalendar-weekContainer": {
+        margin: 0,
+        justifyContent: "space-between",
+        
+        "& .MuiPickersDay-root": {
+          width: "36px",
+          height: "36px",
+          margin: "2px",
+          fontSize: "0.875rem",
+          fontWeight: 600,
+        }
+      },
+
+      "& .MuiPickersDay-root": {
+        "&.Mui-selected": {
+          bgcolor: VERDE_INSTITUCIONAL,
+          color: "#fff",
+          fontWeight: 900,
+          "&:hover": { bgcolor: VERDE_INSTITUCIONAL }
+        },
+        "&.MuiPickersDay-today": { 
+          borderColor: VERDE_INSTITUCIONAL,
+          borderWidth: "2px",
+          fontWeight: 900,
+        },
+      },
+
       "& .MuiClock-pin": { bgcolor: VERDE_INSTITUCIONAL },
       "& .MuiClockPointer-root": { bgcolor: VERDE_INSTITUCIONAL },
-      "& .MuiClockPointer-thumb": { bgcolor: VERDE_INSTITUCIONAL, borderColor: VERDE_INSTITUCIONAL },
+      "& .MuiClockPointer-thumb": {
+        bgcolor: VERDE_INSTITUCIONAL,
+        borderColor: VERDE_INSTITUCIONAL
+      },
+
       "& .MuiClockNumber-root": { fontWeight: 800 },
-      "& .MuiDialogActions-root .MuiButton-root": { color: VERDE_INSTITUCIONAL, fontWeight: 900 }
+      "& .MuiDialogActions-root .MuiButton-root": {
+        color: VERDE_INSTITUCIONAL,
+        fontWeight: 900
+      }
     }
   };
 

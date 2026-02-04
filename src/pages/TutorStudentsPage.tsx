@@ -279,7 +279,7 @@ export default function TutorStudentsPage() {
                             textAlign: "center",
                           }}
                         >
-                          Foto
+                          Inicial
                         </TableCell>
                         <TableCell
                           sx={{
