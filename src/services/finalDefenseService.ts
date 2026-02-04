@@ -166,7 +166,7 @@ export async function adminFinalListJuries(): Promise<JuryUserDto[]> {
     // Hacer 2 peticiones: una para ROLE_TUTOR y otra para ROLE_DOCENTE
     const [tutorsRes, coordinatorsRes] = await Promise.all([
       api.get<JuryUserDto[]>("/admin/users", { params: { role: "ROLE_TUTOR" } }),
-      api.get<JuryUserDto[]>("/admin/users", { params: { role: "ROLE_DOCENTE" } })
+      api.get<JuryUserDto[]>("/admin/users", { params: { role: "ROLE_COORDINATOR" } })
     ]);
 
     const tutors = tutorsRes.data ?? [];

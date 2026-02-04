@@ -32,6 +32,7 @@ import {
   Email as EmailIcon,
   Badge as BadgeIcon,
   AccountCircle as AccountCircleIcon,
+  Gavel as GavelIcon, // ✅ IMPORTADO
 } from "@mui/icons-material";
 
 import { logout } from "../services/authService";
@@ -55,7 +56,6 @@ export default function CoordinatorStudentsPage() {
   const coordinatorInfo = useMemo(() => {
     console.log("🔍 Verificando localStorage...");
     
-    // Intentar obtener de diferentes claves posibles
     const possibleKeys = ["user", "currentUser", "userData", "authUser"];
     let user = null;
     
@@ -84,7 +84,6 @@ export default function CoordinatorStudentsPage() {
       };
     }
 
-    // Intentar múltiples combinaciones de campos
     const info = {
       username: user.username || user.userName || user.user || user.email?.split("@")[0] || "",
       name: user.name || 
@@ -168,19 +167,9 @@ export default function CoordinatorStudentsPage() {
 
   useEffect(() => {
     load();
-    // Cargar foto guardada del coordinador
     const savedPhoto = localStorage.getItem("coordinatorPhoto");
     if (savedPhoto) {
       setPhotoPreview(savedPhoto);
-    }
-
-    // 🔍 DEBUG: Mostrar todo el localStorage
-    console.log("🗄️ TODO el localStorage:");
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) {
-        console.log(`  ${key}:`, localStorage.getItem(key));
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -194,13 +183,10 @@ export default function CoordinatorStudentsPage() {
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validar tipo de archivo
       if (!file.type.startsWith('image/')) {
         alert('Por favor selecciona un archivo de imagen válido');
         return;
       }
-
-      // Validar tamaño (máximo 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('La imagen es demasiado grande. Por favor selecciona una imagen menor a 5MB');
         return;
@@ -211,7 +197,6 @@ export default function CoordinatorStudentsPage() {
         const photoData = reader.result as string;
         setPhotoPreview(photoData);
         localStorage.setItem("coordinatorPhoto", photoData);
-        console.log("✅ Foto guardada en localStorage");
       };
       reader.onerror = () => {
         alert('Error al cargar la imagen. Por favor intenta de nuevo.');
@@ -226,14 +211,12 @@ export default function CoordinatorStudentsPage() {
     return "success";
   };
 
-  // Obtener el nombre para mostrar en el tooltip
   const getDisplayName = () => {
     if (coordinatorInfo?.name) return coordinatorInfo.name;
     if (coordinatorInfo?.username) return coordinatorInfo.username;
     return "Usuario";
   };
 
-  // Obtener iniciales del usuario
   const getInitials = () => {
     if (coordinatorInfo?.name) {
       const parts = coordinatorInfo.name.split(" ");
@@ -250,7 +233,7 @@ export default function CoordinatorStudentsPage() {
 
   return (
     <Box sx={{ minHeight: "100vh", background: "#f0f2f5", display: "flex", flexDirection: "column" }}>
-      {/* HEADER VERDE - Elementos en las esquinas */}
+      {/* HEADER VERDE */}
       <Box
         sx={{
           bgcolor: VERDE_INSTITUCIONAL,
@@ -278,8 +261,23 @@ export default function CoordinatorStudentsPage() {
             </Typography>
           </Box>
 
-          {/* ESQUINA DERECHA: Botón Refrescar + Avatar */}
+          {/* ESQUINA DERECHA: Botones + Avatar */}
           <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            
+            {/* ✅ BOTÓN NUEVO: Ir a Defensa Final como Jurado */}
+            <Tooltip title="Defensa Final (como jurado)" arrow>
+              <IconButton
+                onClick={() => nav("/jury/final-defense")}
+                sx={{
+                  color: "white",
+                  bgcolor: "rgba(255,255,255,0.2)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.3)" },
+                }}
+              >
+                <GavelIcon />
+              </IconButton>
+            </Tooltip>
+
             <Tooltip title="Recargar página" arrow>
               <IconButton
                 onClick={load}
@@ -365,83 +363,14 @@ export default function CoordinatorStudentsPage() {
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell
-                          sx={{
-                            bgcolor: VERDE_INSTITUCIONAL,
-                            color: "white",
-                            fontWeight: 900,
-                            textAlign: "center",
-                          }}
-                        >
-                          Inicial
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            bgcolor: VERDE_INSTITUCIONAL,
-                            color: "white",
-                            fontWeight: 900,
-                            textAlign: "center",
-                          }}
-                        >
-                          DNI
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            bgcolor: VERDE_INSTITUCIONAL,
-                            color: "white",
-                            fontWeight: 900,
-                          }}
-                        >
-                          Nombres
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            bgcolor: VERDE_INSTITUCIONAL,
-                            color: "white",
-                            fontWeight: 900,
-                          }}
-                        >
-                          Apellidos
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            bgcolor: VERDE_INSTITUCIONAL,
-                            color: "white",
-                            fontWeight: 900,
-                          }}
-                        >
-                          Carrera
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            bgcolor: VERDE_INSTITUCIONAL,
-                            color: "white",
-                            fontWeight: 900,
-                            textAlign: "center",
-                          }}
-                        >
-                          Corte
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            bgcolor: VERDE_INSTITUCIONAL,
-                            color: "white",
-                            fontWeight: 900,
-                            textAlign: "center",
-                          }}
-                        >
-                          Sección
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            bgcolor: VERDE_INSTITUCIONAL,
-                            color: "white",
-                            fontWeight: 900,
-                            textAlign: "center",
-                          }}
-                        >
-                          Estado
-                        </TableCell>
+                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>Inicial</TableCell>
+                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>DNI</TableCell>
+                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}>Nombres</TableCell>
+                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}>Apellidos</TableCell>
+                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}>Carrera</TableCell>
+                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>Corte</TableCell>
+                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>Sección</TableCell>
+                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>Estado</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -461,27 +390,15 @@ export default function CoordinatorStudentsPage() {
                             sx={{
                               cursor: "pointer",
                               transition: "all 0.2s",
-                              "&:hover": {
-                                bgcolor: "#f5f5f5",
-                              },
+                              "&:hover": { bgcolor: "#f5f5f5" },
                             }}
                           >
                             <TableCell align="center">
-                              <Avatar
-                                sx={{
-                                  bgcolor: VERDE_INSTITUCIONAL,
-                                  width: 32,
-                                  height: 32,
-                                  fontSize: "0.875rem",
-                                  mx: "auto",
-                                }}
-                              >
+                              <Avatar sx={{ bgcolor: VERDE_INSTITUCIONAL, width: 32, height: 32, fontSize: "0.875rem", mx: "auto" }}>
                                 {row.firstName?.charAt(0) || "?"}
                               </Avatar>
                             </TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 600 }}>
-                              {row.dni}
-                            </TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 600 }}>{row.dni}</TableCell>
                             <TableCell>{row.firstName}</TableCell>
                             <TableCell>{row.lastName}</TableCell>
                             <TableCell>{row.career}</TableCell>
@@ -492,11 +409,7 @@ export default function CoordinatorStudentsPage() {
                                 label={row.status}
                                 color={getStatusColor(row.status)}
                                 size="small"
-                                sx={{
-                                  fontWeight: 900,
-                                  fontSize: "0.75rem",
-                                  borderRadius: "10px",
-                                }}
+                                sx={{ fontWeight: 900, fontSize: "0.75rem", borderRadius: "10px" }}
                               />
                             </TableCell>
                           </TableRow>
@@ -512,18 +425,11 @@ export default function CoordinatorStudentsPage() {
       </Box>
 
       {/* FOOTER VERDE */}
-      <Box
-        sx={{
-          bgcolor: VERDE_INSTITUCIONAL,
-          color: "white",
-          py: 2,
-          textAlign: "center",
-        }}
-      >
+      <Box sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", py: 2, textAlign: "center" }}>
         <Typography variant="body2">© 2025 - Panel de Coordinador</Typography>
       </Box>
 
-      {/* DRAWER LATERAL - NO TAPA EL FOOTER */}
+      {/* DRAWER LATERAL */}
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -538,51 +444,24 @@ export default function CoordinatorStudentsPage() {
           },
         }}
         ModalProps={{
-          sx: {
-            "& .MuiBackdrop-root": {
-              backgroundColor: "rgba(0, 0, 0, 0.3)",
-            },
-          },
+          sx: { "& .MuiBackdrop-root": { backgroundColor: "rgba(0, 0, 0, 0.3)" } },
         }}
       >
         <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-          {/* Header del Drawer */}
-          <Box
-            sx={{
-              p: 2,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              borderBottom: "1px solid #eee",
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL }}>
-              Mi Perfil
-            </Typography>
-            
+          <Box sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #eee" }}>
+            <Typography variant="h6" sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL }}>Mi Perfil</Typography>
             <Box sx={{ display: "flex", gap: 0.5 }}>
               <Tooltip title="Cerrar Sesión" arrow>
-                <IconButton
-                  onClick={handleLogout}
-                  size="small"
-                  sx={{
-                    color: "#d32f2f",
-                    "&:hover": {
-                      bgcolor: "rgba(211, 47, 47, 0.08)",
-                    },
-                  }}
-                >
+                <IconButton onClick={handleLogout} size="small" sx={{ color: "#d32f2f", "&:hover": { bgcolor: "rgba(211, 47, 47, 0.08)" } }}>
                   <LogoutOutlined fontSize="small" />
                 </IconButton>
               </Tooltip>
-
               <IconButton onClick={() => setDrawerOpen(false)} size="small">
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
           </Box>
 
-          {/* Contenido del Perfil */}
           <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
             <Box sx={{ textAlign: "center", mb: 2.5 }}>
               <Box sx={{ position: "relative", display: "inline-block" }}>
@@ -598,42 +477,22 @@ export default function CoordinatorStudentsPage() {
                     border: "3px solid #f0f2f5",
                     cursor: "pointer",
                     transition: "all 0.3s ease",
-                    "&:hover": {
-                      transform: "scale(1.05)",
-                      border: `3px solid ${VERDE_INSTITUCIONAL}`,
-                    },
+                    "&:hover": { transform: "scale(1.05)", border: `3px solid ${VERDE_INSTITUCIONAL}` },
                   }}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {getInitials()}
                 </Avatar>
               </Box>
-
               <Typography variant="h6" sx={{ fontWeight: 900, mb: 0.5, fontSize: "1rem" }}>
                 {coordinatorInfo?.name || coordinatorInfo?.username || "Usuario"}
               </Typography>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handlePhotoChange}
-                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                style={{ display: "none" }}
-              />
-
+              <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" style={{ display: "none" }} />
               <Button
                 variant="text"
                 startIcon={<PhotoCameraIcon fontSize="small" />}
                 onClick={() => fileInputRef.current?.click()}
-                sx={{
-                  color: VERDE_INSTITUCIONAL,
-                  textTransform: "none",
-                  fontWeight: 600,
-                  fontSize: "0.75rem",
-                  "&:hover": {
-                    bgcolor: "rgba(0, 139, 139, 0.05)",
-                  },
-                }}
+                sx={{ color: VERDE_INSTITUCIONAL, textTransform: "none", fontWeight: 600, fontSize: "0.75rem", "&:hover": { bgcolor: "rgba(0, 139, 139, 0.05)" } }}
               >
                 Cambiar Foto
               </Button>
@@ -642,22 +501,11 @@ export default function CoordinatorStudentsPage() {
             <Divider sx={{ mb: 2 }} />
 
             <Stack spacing={1.2}>
-              {/* Username */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.2,
-                  bgcolor: "rgba(248, 249, 250, 0.9)",
-                  borderRadius: 5,
-                  border: "1px solid #e9ecef",
-                }}
-              >
+              <Paper elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248, 249, 250, 0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
                   <AccountCircleIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>
-                      Username
-                    </Typography>
+                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>Username</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600, color: coordinatorInfo?.username ? "#212529" : "#adb5bd", fontSize: "0.813rem" }}>
                       {coordinatorInfo?.username || "Sin asignar"}
                     </Typography>
@@ -665,22 +513,11 @@ export default function CoordinatorStudentsPage() {
                 </Box>
               </Paper>
 
-              {/* Name */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.2,
-                  bgcolor: "rgba(248, 249, 250, 0.9)",
-                  borderRadius: 5,
-                  border: "1px solid #e9ecef",
-                }}
-              >
+              <Paper elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248, 249, 250, 0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
                   <PersonIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>
-                      Nombre Completo
-                    </Typography>
+                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>Nombre Completo</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600, color: coordinatorInfo?.name ? "#212529" : "#adb5bd", fontSize: "0.813rem" }}>
                       {coordinatorInfo?.name || "Sin asignar"}
                     </Typography>
@@ -688,22 +525,11 @@ export default function CoordinatorStudentsPage() {
                 </Box>
               </Paper>
 
-              {/* Email */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.2,
-                  bgcolor: "rgba(248, 249, 250, 0.9)",
-                  borderRadius: 5,
-                  border: "1px solid #e9ecef",
-                }}
-              >
+              <Paper elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248, 249, 250, 0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
                   <EmailIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>
-                      Email
-                    </Typography>
+                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>Email</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600, color: coordinatorInfo?.email ? "#212529" : "#adb5bd", fontSize: "0.813rem", wordBreak: "break-word" }}>
                       {coordinatorInfo?.email || "Sin asignar"}
                     </Typography>
@@ -711,32 +537,15 @@ export default function CoordinatorStudentsPage() {
                 </Box>
               </Paper>
 
-              {/* Role */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.2,
-                  bgcolor: "rgba(248, 249, 250, 0.9)",
-                  borderRadius: 5,
-                  border: "1px solid #e9ecef",
-                }}
-              >
+              <Paper elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248, 249, 250, 0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
                   <BadgeIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem", mb: 0.3, display: "block" }}>
-                      Rol
-                    </Typography>
+                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem", mb: 0.3, display: "block" }}>Rol</Typography>
                     <Chip
                       label={coordinatorInfo?.role || "Sin asignar"}
                       size="small"
-                      sx={{
-                        bgcolor: VERDE_INSTITUCIONAL,
-                        color: "white",
-                        fontWeight: 700,
-                        fontSize: "0.7rem",
-                        height: "22px",
-                      }}
+                      sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 700, fontSize: "0.7rem", height: "22px" }}
                     />
                   </Box>
                 </Box>

@@ -3,9 +3,9 @@ import { useState, useMemo } from "react";
 import { 
   Box, 
   Typography, 
-  TextField,
-  InputAdornment,
-  Chip
+  TextField, 
+  InputAdornment, 
+  Chip 
 } from "@mui/material";
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 
@@ -35,22 +35,10 @@ export default function JuriesSelector({
 
   const [searchTerm, setSearchTerm] = useState("");
 
-  // ✅ ROLES PERMITIDOS: TUTOR Y COORDINADOR (DOCENTE)
-  const allowedRoles = ["ROLE_TUTOR", "ROLE_DOCENTE"];
-
-  // ✅ FILTRADO: roles + búsqueda
+  // ✅ FILTRADO: Sin restricciones de roles, solo búsqueda
   const filteredJuries = useMemo(() => {
-    console.log("🔍 Total de jurados recibidos:", juries.length);
-    
-    // 1. Filtrar por roles permitidos
-    let filtered = juries.filter(j => {
-      const hasRoles = Array.isArray(j.roles) && j.roles.some(role => allowedRoles.includes(role));
-      return hasRoles;
-    });
+    let filtered = [...juries];
 
-    console.log("✅ Jurados con roles válidos (TUTOR/COORDINADOR):", filtered.length);
-
-    // 2. Filtrar por búsqueda (nombre, email o DNI)
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(j => 
@@ -58,20 +46,18 @@ export default function JuriesSelector({
         j.email.toLowerCase().includes(term) ||
         (j.dni && j.dni.toLowerCase().includes(term))
       );
-      console.log("🔎 Después de búsqueda:", filtered.length);
     }
 
     return filtered;
   }, [juries, searchTerm]);
 
-  const totalJuriesWithRoles = juries.filter(j => 
-    Array.isArray(j.roles) && j.roles.some(role => allowedRoles.includes(role))
-  ).length;
+  // Total simple
+  const totalJuriesAvailable = juries.length;
 
   return (
     <>
       <Typography sx={{ fontWeight: 800, mt: 3, mb: 1, fontSize: "0.9rem" }}>
-        👨‍⚖️ Jurados - Tutores y Coordinadores (exactamente 3)
+        👨‍⚖️ Jurados - Selección
       </Typography>
 
       {/* BUSCADOR */}
@@ -101,7 +87,7 @@ export default function JuriesSelector({
         />
         
         <Typography sx={{ mt: 1, fontSize: "0.75rem", color: "#666", fontStyle: "italic" }}>
-          📊 Total disponibles: {totalJuriesWithRoles} jurados (Tutores y Coordinadores)
+          📊 Total usuarios disponibles: {totalJuriesAvailable}
         </Typography>
       </Box>
 
@@ -123,9 +109,10 @@ export default function JuriesSelector({
         {filteredJuries.map((j) => {
           const checked = selectedJuryIds.includes(j.id);
           
-          // Determinar roles para mostrar
+          // Detección visual de roles (solo informativo)
           const isTutor = j.roles?.includes("ROLE_TUTOR");
-          const isCoordinator = j.roles?.includes("ROLE_DOCENTE");
+          const isCoordinator = j.roles?.includes("ROLE_COORDINATOR");
+          const isJury = j.roles?.includes("ROLE_JURY");
 
           return (
             <Box
@@ -152,48 +139,18 @@ export default function JuriesSelector({
                       {j.fullName}
                     </Typography>
                     
-                    {/* Badges de rol */}
+                    {/* Badges informativos */}
                     {isTutor && (
-                      <Chip
-                        label="🎓 Tutor"
-                        size="small"
-                        sx={{
-                          bgcolor: "#e3f2fd",
-                          color: "#1976d2",
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          height: 20
-                        }}
-                      />
+                      <Chip label="🎓 Tutor" size="small" sx={{ bgcolor: "#e3f2fd", color: "#1976d2", fontSize: "0.65rem", fontWeight: 800, height: 20 }} />
                     )}
-                    
                     {isCoordinator && (
-                      <Chip
-                        label="👔 Coordinador"
-                        size="small"
-                        sx={{
-                          bgcolor: "#f3e5f5",
-                          color: "#7b1fa2",
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          height: 20
-                        }}
-                      />
+                      <Chip label="👔 Coordinador" size="small" sx={{ bgcolor: "#f3e5f5", color: "#7b1fa2", fontSize: "0.65rem", fontWeight: 800, height: 20 }} />
                     )}
-                    
-                    {/* Badge de carrera si existe */}
+                    {isJury && (
+                      <Chip label="⚖️ Jurado" size="small" sx={{ bgcolor: "#e8f5e9", color: "#2e7d32", fontSize: "0.65rem", fontWeight: 800, height: 20 }} />
+                    )}
                     {j.careerName && (
-                      <Chip
-                        label={j.careerName}
-                        size="small"
-                        sx={{
-                          bgcolor: "#fff3e0",
-                          color: "#e65100",
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          height: 20
-                        }}
-                      />
+                      <Chip label={j.careerName} size="small" sx={{ bgcolor: "#fff3e0", color: "#e65100", fontSize: "0.65rem", fontWeight: 800, height: 20 }} />
                     )}
                   </Box>
 
@@ -202,7 +159,7 @@ export default function JuriesSelector({
                     📧 {j.email}
                   </Typography>
 
-                  {/* DNI si existe */}
+                  {/* DNI */}
                   {j.dni && (
                     <Typography sx={{ color: "#888", fontSize: "0.75rem", mt: 0.3 }}>
                       🆔 {j.dni}
@@ -212,22 +169,7 @@ export default function JuriesSelector({
 
                 {/* Checkmark */}
                 {checked && (
-                  <Box
-                    sx={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "50%",
-                      bgcolor: VERDE_INSTITUCIONAL,
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 900,
-                      fontSize: "0.9rem",
-                      flexShrink: 0,
-                      ml: 2
-                    }}
-                  >
+                  <Box sx={{ width: 24, height: 24, borderRadius: "50%", bgcolor: VERDE_INSTITUCIONAL, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "0.9rem", flexShrink: 0, ml: 2 }}>
                     ✓
                   </Box>
                 )}
@@ -237,47 +179,35 @@ export default function JuriesSelector({
         })}
 
         {!filteredJuries.length && (
-          <Box sx={{ 
-            textAlign: 'center', 
-            py: 4, 
-            bgcolor: '#f9f9f9', 
-            borderRadius: 2,
-            border: '1px dashed #ddd'
-          }}>
-            <Typography sx={{ color: "#777", fontStyle: "italic", mb: 1 }}>
+          <Box sx={{ textAlign: 'center', py: 4, bgcolor: '#f9f9f9', borderRadius: 2, border: '1px dashed #ddd' }}>
+            <Typography sx={{ color: "#777", fontStyle: "italic" }}>
               {searchTerm 
-                ? `❌ No se encontraron jurados con "${searchTerm}"`
-                : "⚠️ No hay jurados disponibles con roles de Tutor o Coordinador"
+                ? `❌ No se encontraron resultados para "${searchTerm}"`
+                : "⚠️ No hay usuarios disponibles."
               }
-            </Typography>
-            <Typography sx={{ color: "#999", fontSize: "0.75rem" }}>
-              Verifica que los usuarios tengan asignados los roles ROLE_TUTOR o ROLE_DOCENTE
             </Typography>
           </Box>
         )}
 
-        {/* Contador de selección */}
+        {/* ✅ CONTADOR DINÁMICO SIN LÍMITE */}
         <Box sx={{ 
           textAlign: "center", 
           py: 1.5, 
-          bgcolor: selectedJuryIds.length === 3 ? `${VERDE_INSTITUCIONAL}08` : "#f9f9f9",
+          bgcolor: selectedJuryIds.length > 0 ? `${VERDE_INSTITUCIONAL}08` : "#f9f9f9",
           borderRadius: 2,
-          border: `1px solid ${selectedJuryIds.length === 3 ? VERDE_INSTITUCIONAL : "#eee"}`,
+          border: `1px solid ${selectedJuryIds.length > 0 ? VERDE_INSTITUCIONAL : "#eee"}`,
           position: 'sticky',
           bottom: 0,
           zIndex: 1
         }}>
           <Typography
             sx={{
-              color: selectedJuryIds.length === 3 ? VERDE_INSTITUCIONAL : "#666",
+              color: selectedJuryIds.length > 0 ? VERDE_INSTITUCIONAL : "#666",
               fontSize: "0.85rem",
               fontWeight: 900,
             }}
           >
-            {selectedJuryIds.length === 3 
-              ? "✅ 3/3 jurados seleccionados (Completo)" 
-              : `Seleccionados: ${selectedJuryIds.length}/3`
-            }
+            👥 Jurados seleccionados: {selectedJuryIds.length}
           </Typography>
         </Box>
       </Box>

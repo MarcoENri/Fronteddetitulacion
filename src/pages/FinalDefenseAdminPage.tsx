@@ -157,6 +157,7 @@ export default function FinalDefenseAdminPage() {
     }
   };
 
+  // ✅ AQUÍ ESTÁ EL CAMBIO SOLICITADO
   const openWindowManage = async (w: FinalDefenseWindowDto) => {
     setActiveWindow(w);
     setOpenManage(true);
@@ -171,9 +172,23 @@ export default function FinalDefenseAdminPage() {
 
     setLoading(true);
     try {
-      const [sl, ju] = await Promise.all([adminFinalListSlots(w.id), adminFinalListJuries()]);
+      // 1. Cargamos Slots y Juries en paralelo
+      const [sl, ju] = await Promise.all([
+        adminFinalListSlots(w.id),
+        adminFinalListJuries() // 👈 Llamada al nuevo servicio
+      ]);
+      
       setSlots(sl);
       setJuries(ju);
+
+      // 2. 🔍 Console.table para depuración
+      console.table(
+        ju.map(j => ({
+          id: j.id,
+          name: j.fullName,
+          roles: j.roles
+        }))
+      );
 
       // Carga condicional: si la ventana tiene carrera fija, cargamos. Si no, esperamos selección.
       const cid = w.careerId ?? null;
@@ -252,49 +267,52 @@ export default function FinalDefenseAdminPage() {
     });
   };
 
-  const toggleJury = (id: number) => {
-    setSelectedJuryIds((prev) => {
-      const exists = prev.includes(id);
-      if (exists) return prev.filter((x) => x !== id);
-      if (prev.length >= 3) return prev;
-      return [...prev, id];
-    });
-  };
+ const toggleJury = (id: number) => {
+  setSelectedJuryIds(prev =>
+    prev.includes(id)
+      ? prev.filter(j => j !== id) // Quitar si ya existe
+      : [...prev, id]              // ✅ Agregar sin restricción de cantidad
+  );
+};
 
   const handleCreateBooking = async () => {
-    if (!activeWindow) return;
-    if (!selectedSlotId) return alert("Selecciona un slot");
-    if (selectedStudentIds.length < 1) return alert("Selecciona 1 o 2 estudiantes");
-    if (selectedJuryIds.length !== 3) return alert("Selecciona exactamente 3 jurados");
+  if (!activeWindow) return;
+  if (!selectedSlotId) return alert("Selecciona un slot");
+  if (selectedStudentIds.length < 1) return alert("Selecciona 1 o 2 estudiantes")
+  if (selectedJuryIds.length < 1)
+    return alert("Selecciona al menos un jurado");
 
-    const selected = students.filter(s => selectedStudentIds.includes(s.id));
-    const invalid = selected.find(s => !s.projectName?.trim());
-    if (invalid) {
-      return alert(
-        `El estudiante ${invalid.fullName} (${invalid.dni}) no tiene proyecto asignado`
-      );
-    }
+  const selected = students.filter(s =>
+    selectedStudentIds.includes(s.id)
+  );
 
-    setLoading(true);
-    try {
-      await adminFinalCreateBooking({
-        slotId: Number(selectedSlotId),
-        studentIds: selectedStudentIds,
-        juryUserIds: selectedJuryIds,
-      });
+  const invalid = selected.find(s => !s.projectName?.trim());
+  if (invalid) {
+    return alert(
+      `El estudiante ${invalid.fullName} (${invalid.dni}) no tiene proyecto asignado`
+    );
+  }
 
-      await reloadSlots();
-      setSelectedSlotId("");
-      setSelectedStudentIds([]);
-      setSelectedJuryIds([]);
+  setLoading(true);
+  try {
+    await adminFinalCreateBooking({
+      slotId: Number(selectedSlotId),
+      studentIds: selectedStudentIds,
+      juryUserIds: selectedJuryIds, // ✅ cualquier cantidad
+    });
 
-      alert("Booking creado ✅");
-    } catch (e: any) {
-      alert(e?.response?.data?.message ?? "No se pudo crear booking");
-    } finally {
-      setLoading(false);
-    }
-  };
+    await reloadSlots();
+    setSelectedSlotId("");
+    setSelectedStudentIds([]);
+    setSelectedJuryIds([]);
+
+    alert("Booking creado ✅");
+  } catch (e: any) {
+    alert(e?.response?.data?.message ?? "No se pudo crear booking");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ESTILOS PREMIUM
   const cleanPopperStyle = {
@@ -938,7 +956,7 @@ export default function FinalDefenseAdminPage() {
                     !selectedSlotId ||
                     selectedStudentIds.length < 1 ||
                     selectedStudentIds.length > 2 ||
-                    selectedJuryIds.length !== 3
+                    selectedJuryIds.length < 1
                   }
                   variant="contained"
                   sx={{ 
