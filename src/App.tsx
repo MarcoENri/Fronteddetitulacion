@@ -27,8 +27,21 @@ type MeDto = { username: string; roles: string[] };
 const normalizeRoles = (roles: string[]) =>
   roles.map((r) => (r.startsWith("ROLE_") ? r : `ROLE_${r}`));
 
-// ✅ COMPONENTE UNIFICADO: Acepta un array de roles permitidos
 function RequireRole({
+  children,
+  role,
+}: {
+  children: ReactNode;
+  role: "ROLE_ADMIN" | "ROLE_COORDINATOR" | "ROLE_TUTOR" | "ROLE_JURY";
+}) {
+  return (
+    <RequireAnyRole rolesAllowed={[role]}>
+      {children}
+    </RequireAnyRole>
+  );
+}
+
+function RequireAnyRole({
   children,
   rolesAllowed,
 }: {
@@ -62,10 +75,8 @@ function RequireRole({
   if (!token) return <Navigate to="/" replace />;
   if (loading) return null;
 
-  const roles = normalizeRoles(me?.roles ?? []);
-
-  // Verificar si tiene ALGUNO de los roles permitidos
-  const allowed = rolesAllowed.some((r) => roles.includes(r));
+  const userRoles = normalizeRoles(me?.roles ?? []);
+  const allowed = rolesAllowed.some((r) => userRoles.includes(r));
 
   return allowed ? <>{children}</> : <Navigate to="/" replace />;
 }
@@ -112,64 +123,35 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* ADMIN */}
-        <Route 
-          path="/admin" 
-          element={<RequireRole rolesAllowed={["ROLE_ADMIN"]}><AdminStudentsPage /></RequireRole>} 
-        />
-        <Route 
-          path="/admin/students/by-career" 
-          element={<RequireRole rolesAllowed={["ROLE_ADMIN"]}><AdminStudentsByCareerPage /></RequireRole>} 
-        />
-        <Route 
-          path="/admin/students/:id" 
-          element={<RequireRole rolesAllowed={["ROLE_ADMIN"]}><StudentDetailPage /></RequireRole>} 
-        />
-        <Route 
-          path="/admin/predefense" 
-          element={<RequireRole rolesAllowed={["ROLE_ADMIN"]}><AdminPredefensePage /></RequireRole>} 
-        />
-        <Route 
-          path="/admin/final-defense" 
-          element={<RequireRole rolesAllowed={["ROLE_ADMIN"]}><FinalDefenseAdminPage /></RequireRole>} 
-        />
+        <Route path="/admin" element={<RequireRole role="ROLE_ADMIN"><AdminStudentsPage /></RequireRole>} />
+        <Route path="/admin/students/by-career" element={<RequireRole role="ROLE_ADMIN"><AdminStudentsByCareerPage /></RequireRole>} />
+        <Route path="/admin/students/:id" element={<RequireRole role="ROLE_ADMIN"><StudentDetailPage /></RequireRole>} />
+        <Route path="/admin/predefense" element={<RequireRole role="ROLE_ADMIN"><AdminPredefensePage /></RequireRole>} />
+        <Route path="/admin/final-defense" element={<RequireRole role="ROLE_ADMIN"><FinalDefenseAdminPage /></RequireRole>} />
 
         {/* COORDINADOR */}
-        <Route 
-          path="/coordinator" 
-          element={<RequireRole rolesAllowed={["ROLE_COORDINATOR"]}><CoordinatorStudentsPage /></RequireRole>} 
-        />
-        <Route 
-          path="/coordinator/students/:id" 
-          element={<RequireRole rolesAllowed={["ROLE_COORDINATOR"]}><CoordinatorStudentDetailPage /></RequireRole>} 
-        />
+        <Route path="/coordinator" element={<RequireRole role="ROLE_COORDINATOR"><CoordinatorStudentsPage /></RequireRole>} />
+        <Route path="/coordinator/students/:id" element={<RequireRole role="ROLE_COORDINATOR"><CoordinatorStudentDetailPage /></RequireRole>} />
 
         {/* TUTOR */}
-        <Route 
-          path="/tutor" 
-          element={<RequireRole rolesAllowed={["ROLE_TUTOR"]}><TutorStudentsPage /></RequireRole>} 
-        />
-        <Route 
-          path="/tutor/students/:id" 
-          element={<RequireRole rolesAllowed={["ROLE_TUTOR"]}><TutorStudentDetailPage /></RequireRole>} 
-        />
+        <Route path="/tutor" element={<RequireRole role="ROLE_TUTOR"><TutorStudentsPage /></RequireRole>} />
+        <Route path="/tutor/students/:id" element={<RequireRole role="ROLE_TUTOR"><TutorStudentDetailPage /></RequireRole>} />
 
-        {/* JURADO - PREDEFENSA (Generalmente solo jurados puros, pero ajustable) */}
+        {/* JURADO (ACEPTA TUTOR + COORDINADOR) */}
         <Route
           path="/jury/predefense"
           element={
-            <RequireRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
+            <RequireAnyRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
               <JuryPredefensePage />
-            </RequireRole>
+            </RequireAnyRole>
           }
         />
-
-        {/* JURADO - DEFENSA FINAL (Acepta Jurado, Coordinador y Tutor) */}
         <Route
           path="/jury/final-defense"
           element={
-            <RequireRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
+            <RequireAnyRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
               <FinalDefenseJuryPage />
-            </RequireRole>
+            </RequireAnyRole>
           }
         />
 

@@ -3,35 +3,23 @@ import { api } from "../api/api";
 
 // ==================== TYPES ====================
 
-// Ventana de predefensa (Admin y Jury)
 export type PredefenseWindowDto = {
   id: number;
-
-  // OJO: en algunos endpoints tu back puede NO mandar esto siempre
   academicPeriodId?: number;
   academicPeriodName?: string;
-
   careerId?: number | null;
   careerName?: string | null;
-
-  startsAt: string; // "2026-01-22T10:00:00"
+  startsAt: string;
   endsAt: string;
   isActive: boolean;
 };
 
-// Slot: soporta booked o bookingId (según tu backend)
 export type PredefenseSlotDto = {
   id: number;
   windowId?: number;
-
   startsAt: string;
   endsAt: string;
-
-  // Tu back actual parece mandar bookingId (null o number)
   bookingId?: number | null;
-
-  // Algunas pantallas tuyas usan booked
-  // Si el backend NO lo manda, lo derivamos desde bookingId
   booked?: boolean;
 };
 
@@ -58,11 +46,10 @@ export type JuryCareerStudentDto = {
 };
 
 // ==================== HELPERS ====================
-// Normaliza slots para que SIEMPRE tengan booked consistente
+
 function normalizeSlot(sl: PredefenseSlotDto): PredefenseSlotDto {
   const booked =
-    typeof sl.booked === "boolean" ? sl.booked : (sl.bookingId != null);
-
+    typeof sl.booked === "boolean" ? sl.booked : sl.bookingId != null;
   return { ...sl, booked };
 }
 
@@ -89,7 +76,7 @@ export async function adminCloseWindow(id: number): Promise<void> {
   await api.post(`/admin/predefense/windows/${id}/close`);
 }
 
-// ==================== JURY ====================
+// ==================== JURY / COORDINATOR ====================
 
 export async function juryListWindowsByCareer(
   careerId: number,
@@ -114,7 +101,9 @@ export async function juryListStudentsByCareer(
 }
 
 export async function juryListSlots(windowId: number): Promise<PredefenseSlotDto[]> {
-  const res = await api.get<PredefenseSlotDto[]>(`/jury/predefense/windows/${windowId}/slots`);
+  const res = await api.get<PredefenseSlotDto[]>(
+    `/jury/predefense/windows/${windowId}/slots`
+  );
   const list = Array.isArray(res.data) ? res.data : [];
   return list.map(normalizeSlot);
 }
@@ -136,7 +125,10 @@ export async function juryBookSlot(body: {
   slotId: number;
   studentId: number;
 }): Promise<PredefenseBookingDto> {
-  const res = await api.post<PredefenseBookingDto>(`/jury/predefense/bookings`, body);
+  const res = await api.post<PredefenseBookingDto>(
+    `/jury/predefense/bookings`,
+    body
+  );
   return res.data;
 }
 
@@ -155,6 +147,35 @@ export async function juryCreateObservation(
 ): Promise<PredefenseObservationDto> {
   const res = await api.post<PredefenseObservationDto>(
     `/jury/predefense/bookings/${bookingId}/observations`,
+    body
+  );
+  return res.data;
+}
+
+// ==================== TUTOR ====================
+
+export async function tutorListWindows(periodId?: number): Promise<PredefenseWindowDto[]> {
+  const res = await api.get<PredefenseWindowDto[]>(
+    `/tutor/predefense/windows`,
+    { params: periodId ? { periodId } : undefined }
+  );
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function tutorListSlots(windowId: number): Promise<PredefenseSlotDto[]> {
+  const res = await api.get<PredefenseSlotDto[]>(
+    `/tutor/predefense/windows/${windowId}/slots`
+  );
+  const list = Array.isArray(res.data) ? res.data : [];
+  return list.map(normalizeSlot);
+}
+
+export async function tutorCreateObservation(
+  bookingId: number,
+  body: { text: string }
+): Promise<PredefenseObservationDto> {
+  const res = await api.post<PredefenseObservationDto>(
+    `/tutor/predefense/bookings/${bookingId}/observations`,
     body
   );
   return res.data;
