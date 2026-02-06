@@ -21,6 +21,8 @@ export type PredefenseSlotDto = {
   endsAt: string;
   bookingId?: number | null;
   booked?: boolean;
+  studentId?: number | null;      // <-- agregado
+  studentName?: string | null;    // <-- agregado
 };
 
 export type PredefenseBookingDto = {

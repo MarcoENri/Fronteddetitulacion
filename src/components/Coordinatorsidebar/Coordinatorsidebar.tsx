@@ -77,12 +77,14 @@ export default function CoordinatorSidebar({
       path: "/coordinator",
       tooltip: "Ver todos mis estudiantes",
     },
-    {
-      text: "Predefensa (Jurado)",
-      icon: <HowToRegIcon />,
-      path: "/jury/predefense",
-      tooltip: "Gestionar predefensas como jurado",
-    },
+    // ...
+{
+  text: "Predefensa (Jurado)",
+  icon: <HowToRegIcon />,
+  path: "/coordinator/predefense", // <--- Ruta específica
+  tooltip: "Gestionar predefensas como jurado",
+},
+// ...
     {
       text: "Defensa Final (Jurado)",
       icon: <AssignmentIndIcon />,

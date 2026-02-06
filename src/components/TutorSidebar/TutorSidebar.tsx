@@ -22,6 +22,8 @@ interface TutorSidebarProps {
   onLogout: () => void;
   verde: string;
   periodId?: number | null;
+  open?: boolean;        // ← Agregado
+  onClose?: () => void;   // ← Necesario si vas a controlar cierre
 }
 
 const drawerWidth = 260; // Ajustado para que coincida con el layout principal
@@ -39,11 +41,13 @@ export default function TutorSidebar({
       icon: <GroupIcon />,
       path: "/tutor/students"
     },
-    {
-      text: "Predefensas",
-      icon: <AssignmentIcon />,
-      path: `/jury/predefense?periodId=${periodId || ""}`
-    },
+    // ...
+{
+  text: "Predefensas",
+  icon: <AssignmentIcon />,
+  path: `/tutor/predefense?periodId=${periodId || ""}` // <--- Ruta específica
+},
+// ...
     {
       text: "Defensa Final",
       icon: <EmojiEventsIcon />,

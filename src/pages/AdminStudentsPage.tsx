@@ -20,9 +20,6 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 
-// Componente Sidebar
-import AdminSidebar from "../components/SidebarAdmin/AdminSidebar";
-
 // Servicios
 import { importStudentsXlsx, listStudents } from "../services/adminStudentService";
 import type { AdminStudentRow } from "../services/adminStudentService";
@@ -91,9 +88,6 @@ export default function AdminStudentsPage() {
   const [newCareerName, setNewCareerName] = useState("");
   const [newCareerColor, setNewCareerColor] = useState("#546e7a");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  // Estado para el Sidebar
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // -------------------------
   // ✅ CAPA REACTIVA DE DATOS ACELERADA (2 SEGUNDOS)
@@ -308,21 +302,7 @@ export default function AdminStudentsPage() {
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", backgroundColor: "#f4f7f6" }}>
         
-        {/* Renderizado del Sidebar */}
-        <AdminSidebar 
-              
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onOpenPeriod={() => setOpenPeriodModal(true)}
-        onOpenUser={() => setOpenCreateUser(true)}
-        onOpenAssign={() => setOpenAssignCareer(true)}
-        onLogout={() => { logout(); nav("/"); }}
-        verde={VERDE_INSTITUCIONAL}
-        // PASAMOS ESTOS NUEVOS DATOS:
-        careerCards={careerCards} 
-        selectedPeriodId={selectedPeriodId}
-      />
-
+        {/* Header Bar sin la prop de Sidebar */}
         <AdminHeaderBar
           verde={VERDE_INSTITUCIONAL}
           importing={loadingStudents || importing}
@@ -343,7 +323,6 @@ export default function AdminStudentsPage() {
           onChangePeriod={handleSelectPeriod}
           onReloadPeriods={loadPeriods}
           careerStats={careerStats}
-          onOpenSidebar={() => setSidebarOpen(true)} // Activa el sidebar desde el Header
         />
 
         <Container maxWidth={false} sx={{ py: 4, display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
@@ -407,10 +386,18 @@ export default function AdminStudentsPage() {
         <Dialog open={openAdminProfile} onClose={() => setOpenAdminProfile(false)} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ fontWeight: 700 }}>Perfil Administrador</DialogTitle>
           <DialogContent dividers>
-            <Typography sx={{ mb: 1 }}><b>Nombre:</b> {adminProfile?.fullName || "-"}</Typography>
-            <Typography><b>Cédula:</b> {adminProfile?.dni || "-"}</Typography>
+            <Typography sx={{ mb: 2 }}>
+              <b>Nombre:</b> {adminProfile?.fullName || (adminProfile ? `${adminProfile.firstName} ${adminProfile.lastName}` : "-")}
+            </Typography>
+            <Typography sx={{ mb: 1 }}>
+              <b>Correo:</b> {adminProfile?.email || "-"}
+            </Typography>
           </DialogContent>
-          <DialogActions><Button onClick={() => setOpenAdminProfile(false)}>Cerrar</Button></DialogActions>
+          <DialogActions>
+            <Button onClick={() => setOpenAdminProfile(false)} sx={{ fontWeight: 600 }}>
+              Cerrar
+            </Button>
+          </DialogActions>
         </Dialog>
 
         <Dialog open={openAddCareer} onClose={() => setOpenAddCareer(false)} maxWidth="xs" fullWidth>

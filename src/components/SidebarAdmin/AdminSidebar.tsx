@@ -14,36 +14,30 @@ import {
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
-  EventNote as PeriodIcon,
-  PersonAdd as PersonAddIcon,
   Logout as LogoutIcon,
   ChevronLeft as ChevronLeftIcon,
-  Assignment as AssignmentIcon,
-  Gavel as GavelIcon,
   School as SchoolIcon,
   ExpandLess,
   ExpandMore,
   LabelImportant as LabelIcon,
   AddCircle as AddCircleIcon,
   Edit as EditIcon,
-  GroupAdd as GroupAddIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
 interface AdminSidebarProps {
   open: boolean;
   onClose: () => void;
-  onOpenPeriod: () => void;
-  onOpenUser: () => void;
-  onOpenAssign: () => void;
   onLogout: () => void;
   verde: string;
   careerCards: any[];
   selectedPeriodId: number | "ALL";
+  // Propiedades opcionales para evitar errores de TS
+  onOpenPeriod?: () => void;
+  onOpenUser?: () => void;
+  onOpenAssign?: () => void;
   onOpenAddCareer?: () => void;
   onOpenModifyCards?: () => void;
-  onGoPredefense?: () => void;
-  onGoFinalDefense?: () => void;
 }
 
 const drawerWidth = 280;
@@ -51,17 +45,12 @@ const drawerWidth = 280;
 export default function AdminSidebar({ 
   open, 
   onClose, 
-  onOpenPeriod, 
-  onOpenUser, 
-  onOpenAssign, 
   onLogout, 
   verde,
   careerCards,
   selectedPeriodId,
   onOpenAddCareer,
   onOpenModifyCards,
-  onGoPredefense,
-  onGoFinalDefense,
 }: AdminSidebarProps) {
   const nav = useNavigate();
   const [openCareers, setOpenCareers] = useState(false);
@@ -91,6 +80,7 @@ export default function AdminSidebar({
         },
       }}
     >
+      {/* HEADER DEL SIDEBAR */}
       <Box sx={{ display: "flex", alignItems: "center", p: 2, bgcolor: verde }}>
         <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: "bold", color: "white" }}>
           Panel Académico
@@ -136,7 +126,9 @@ export default function AdminSidebar({
               </ListItemButton>
             ))}
 
-            <Divider sx={{ my: 1, bgcolor: "rgba(255,255,255,0.2)", mx: 2 }} />
+            {(onOpenAddCareer || onOpenModifyCards) && (
+              <Divider sx={{ my: 1, bgcolor: "rgba(255,255,255,0.2)", mx: 2 }} />
+            )}
 
             {/* Añadir Carrera */}
             {onOpenAddCareer && (
@@ -171,58 +163,9 @@ export default function AdminSidebar({
             )}
           </List>
         </Collapse>
-
-        <Divider sx={{ my: 1, bgcolor: "rgba(255,255,255,0.1)" }} />
-
-        {/* PREDEFENSA */}
-        {onGoPredefense && (
-          <ListItem disablePadding>
-            <ListItemButton onClick={() => { onGoPredefense(); onClose(); }}>
-              <ListItemIcon sx={{ color: "white" }}><AssignmentIcon /></ListItemIcon>
-              <ListItemText primary="Predefensas" />
-            </ListItemButton>
-          </ListItem>
-        )}
-
-        {/* DEFENSA FINAL */}
-        {onGoFinalDefense && (
-          <ListItem disablePadding>
-            <ListItemButton onClick={() => { onGoFinalDefense(); onClose(); }}>
-              <ListItemIcon sx={{ color: "white" }}><GavelIcon /></ListItemIcon>
-              <ListItemText primary="Defensa Final" />
-            </ListItemButton>
-          </ListItem>
-        )}
-
-        <Divider sx={{ my: 1, bgcolor: "rgba(255,255,255,0.1)" }} />
-
-        {/* GESTIÓN */}
-        <Typography variant="caption" sx={{ px: 3, py: 1, color: "gray", textTransform: "uppercase", fontWeight: 700, display: "block" }}>
-          Gestión Interna
-        </Typography>
-
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => { onOpenPeriod(); onClose(); }}>
-            <ListItemIcon sx={{ color: "white" }}><PeriodIcon /></ListItemIcon>
-            <ListItemText primary="Períodos Académicos" />
-          </ListItemButton>
-        </ListItem>
-
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => { onOpenUser(); onClose(); }}>
-            <ListItemIcon sx={{ color: "white" }}><PersonAddIcon /></ListItemIcon>
-            <ListItemText primary="Nuevo Usuario" />
-          </ListItemButton>
-        </ListItem>
-
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => { onOpenAssign(); onClose(); }}>
-            <ListItemIcon sx={{ color: "white" }}><GroupAddIcon /></ListItemIcon>
-            <ListItemText primary="Asignar Carrera" />
-          </ListItemButton>
-        </ListItem>
       </List>
 
+      {/* BOTÓN CERRAR SESIÓN AL FINAL */}
       <Box sx={{ mt: "auto", pb: 2 }}>
         <Divider sx={{ mb: 1, bgcolor: "rgba(255,255,255,0.1)" }} />
         <ListItem disablePadding>

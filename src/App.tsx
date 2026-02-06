@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { api } from "./api/api";
 
-// --- IMPORTANTE: LÓGICA REACTIVA ---
+// --- LÓGICA REACTIVA ---
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Pages
@@ -17,19 +17,16 @@ import CoordinatorStudentDetailPage from "./pages/CoordinatorStudentDetailPage";
 import TutorStudentsPage from "./pages/TutorStudentsPage";
 import TutorStudentDetailPage from "./pages/TutorStudentDetailPage";
 
-// Predefensa
+// Predefensa y Defensa Final
 import AdminPredefensePage from "./pages/AdminPredefensePage";
 import JuryPredefensePage from "./pages/JuryPredefensePage";
-
-// Defensa Final
 import FinalDefenseAdminPage from "./pages/FinalDefenseAdminPage";
 import FinalDefenseJuryPage from "./pages/FinalDefenseJuryPage";
 
-// 1. CREAMOS EL CLIENTE REACTIVO (El que sincroniza los datos)
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false, // Evita recargas molestas al cambiar de pestaña
+      refetchOnWindowFocus: false,
       retry: 1,
     },
   },
@@ -40,6 +37,8 @@ type MeDto = { username: string; roles: string[] };
 const normalizeRoles = (roles: string[]) =>
   roles.map((r) => (r.startsWith("ROLE_") ? r : `ROLE_${r}`));
 
+// --- COMPONENTES DE PROTECCIÓN DE RUTAS ---
+
 function RequireRole({
   children,
   role,
@@ -47,11 +46,7 @@ function RequireRole({
   children: ReactNode;
   role: "ROLE_ADMIN" | "ROLE_COORDINATOR" | "ROLE_TUTOR" | "ROLE_JURY";
 }) {
-  return (
-    <RequireAnyRole rolesAllowed={[role]}>
-      {children}
-    </RequireAnyRole>
-  );
+  return <RequireAnyRole rolesAllowed={[role]}>{children}</RequireAnyRole>;
 }
 
 function RequireAnyRole({
@@ -59,9 +54,7 @@ function RequireAnyRole({
   rolesAllowed,
 }: {
   children: ReactNode;
-  rolesAllowed: Array<
-    "ROLE_ADMIN" | "ROLE_COORDINATOR" | "ROLE_TUTOR" | "ROLE_JURY"
-  >;
+  rolesAllowed: Array<"ROLE_ADMIN" | "ROLE_COORDINATOR" | "ROLE_TUTOR" | "ROLE_JURY">;
 }) {
   const token = localStorage.getItem("token");
   const [me, setMe] = useState<MeDto | null>(null);
@@ -93,6 +86,8 @@ function RequireAnyRole({
 
   return allowed ? <>{children}</> : <Navigate to="/" replace />;
 }
+
+// --- REDIRECCIÓN INICIAL POR ROL ---
 
 function HomeRedirect() {
   const token = localStorage.getItem("token");
@@ -128,35 +123,44 @@ function HomeRedirect() {
   return <LoginPage />;
 }
 
+// --- COMPONENTE PRINCIPAL ---
+
 export default function App() {
   return (
-    // 2. ENVOLVEMOS TODA LA APP CON EL PROVIDER REACTIVO
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-          {/* ADMIN */}
+          {/* RUTAS DE ADMINISTRADOR */}
           <Route path="/admin" element={<RequireRole role="ROLE_ADMIN"><AdminStudentsPage /></RequireRole>} />
           <Route path="/admin/students/by-career" element={<RequireRole role="ROLE_ADMIN"><AdminStudentsByCareerPage /></RequireRole>} />
           <Route path="/admin/students/:id" element={<RequireRole role="ROLE_ADMIN"><StudentDetailPage /></RequireRole>} />
           <Route path="/admin/predefense" element={<RequireRole role="ROLE_ADMIN"><AdminPredefensePage /></RequireRole>} />
           <Route path="/admin/final-defense" element={<RequireRole role="ROLE_ADMIN"><FinalDefenseAdminPage /></RequireRole>} />
 
-          {/* COORDINADOR */}
+          {/* RUTAS DE COORDINADOR (Ruta dedicada para su predefensa) */}
           <Route path="/coordinator" element={<RequireRole role="ROLE_COORDINATOR"><CoordinatorStudentsPage /></RequireRole>} />
           <Route path="/coordinator/students/:id" element={<RequireRole role="ROLE_COORDINATOR"><CoordinatorStudentDetailPage /></RequireRole>} />
+          <Route 
+            path="/coordinator/predefense" 
+            element={<RequireRole role="ROLE_COORDINATOR"><JuryPredefensePage /></RequireRole>} 
+          />
 
-          {/* TUTOR */}
+          {/* RUTAS DE TUTOR (Ruta dedicada para su predefensa) */}
           <Route path="/tutor" element={<RequireRole role="ROLE_TUTOR"><TutorStudentsPage /></RequireRole>} />
           <Route path="/tutor/students/:id" element={<RequireRole role="ROLE_TUTOR"><TutorStudentDetailPage /></RequireRole>} />
+          <Route 
+            path="/tutor/predefense" 
+            element={<RequireRole role="ROLE_TUTOR"><JuryPredefensePage /></RequireRole>} 
+          />
 
-          {/* JURADO (ACEPTA TUTOR + COORDINADOR) */}
+          {/* RUTAS DE JURADO (Acceso general si es solo jurado) */}
           <Route
             path="/jury/predefense"
             element={
-              <RequireAnyRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
+              <RequireAnyRole rolesAllowed={["ROLE_JURY"]}>
                 <JuryPredefensePage />
               </RequireAnyRole>
             }
@@ -170,6 +174,7 @@ export default function App() {
             }
           />
 
+          {/* REDIRECCIÓN POR DEFECTO */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
