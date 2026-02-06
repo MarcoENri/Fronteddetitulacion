@@ -3,6 +3,9 @@ import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { updateIncident } from "../services/incidentManageService";
 
+// ✅ IMPORTES PARA REACTIVIDAD
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -34,6 +37,35 @@ export default function EditIncidentModal({
   incident,
 }: Props) {
   const [form] = Form.useForm<FormValues>();
+  const queryClient = useQueryClient();
+
+  // ✅ MUTACIÓN REACTIVA
+  // Mantenemos la lógica de llamada al servicio pero envuelta en useMutation
+  const mutation = useMutation({
+    mutationFn: async (values: FormValues) => {
+      if (!incident) return;
+      return await updateIncident(studentId, incident.id, periodId, {
+        stage: values.stage.trim(),
+        date: values.date.format("YYYY-MM-DD"),
+        reason: values.reason.trim(),
+        action: values.action.trim(),
+      });
+    },
+    onSuccess: () => {
+      message.success("Incidencia actualizada ✅");
+      
+      // Invalidamos las queries relacionadas para que la UI se refresque sola
+      queryClient.invalidateQueries({ queryKey: ["studentDetail", String(studentId)] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      
+      onSaved(); // Ejecutamos el callback original
+      onClose();
+      form.resetFields();
+    },
+    onError: (e: any) => {
+      message.error(e?.response?.data?.message ?? "No se pudo actualizar");
+    },
+  });
 
   return (
     <Modal
@@ -44,6 +76,7 @@ export default function EditIncidentModal({
         form.resetFields();
       }}
       onOk={() => form.submit()}
+      confirmLoading={mutation.isPending} // El botón de OK mostrará carga automáticamente
       destroyOnClose
       okText="Guardar"
       cancelText="Cancelar"
@@ -61,23 +94,7 @@ export default function EditIncidentModal({
       <Form
         layout="vertical"
         form={form}
-        onFinish={async (v) => {
-          if (!incident) return;
-          try {
-            await updateIncident(studentId, incident.id, periodId, {
-              stage: v.stage.trim(),
-              date: v.date.format("YYYY-MM-DD"),
-              reason: v.reason.trim(),
-              action: v.action.trim(),
-            });
-            message.success("Incidencia actualizada ✅");
-            onSaved();
-            onClose();
-            form.resetFields();
-          } catch (e: any) {
-            message.error(e?.response?.data?.message ?? "No se pudo actualizar");
-          }
-        }}
+        onFinish={(v) => mutation.mutate(v)} // Usamos la mutación reactiva
       >
         <Form.Item name="stage" label="Etapa" rules={[{ required: true }]}>
           <Input />

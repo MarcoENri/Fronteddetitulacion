@@ -3,6 +3,9 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { api } from "./api/api";
 
+// --- IMPORTANTE: LÓGICA REACTIVA ---
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 // Pages
 import LoginPage from "./pages/LoginPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -21,6 +24,16 @@ import JuryPredefensePage from "./pages/JuryPredefensePage";
 // Defensa Final
 import FinalDefenseAdminPage from "./pages/FinalDefenseAdminPage";
 import FinalDefenseJuryPage from "./pages/FinalDefenseJuryPage";
+
+// 1. CREAMOS EL CLIENTE REACTIVO (El que sincroniza los datos)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Evita recargas molestas al cambiar de pestaña
+      retry: 1,
+    },
+  },
+});
 
 type MeDto = { username: string; roles: string[] };
 
@@ -117,46 +130,49 @@ function HomeRedirect() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomeRedirect />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
+    // 2. ENVOLVEMOS TODA LA APP CON EL PROVIDER REACTIVO
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* ADMIN */}
-        <Route path="/admin" element={<RequireRole role="ROLE_ADMIN"><AdminStudentsPage /></RequireRole>} />
-        <Route path="/admin/students/by-career" element={<RequireRole role="ROLE_ADMIN"><AdminStudentsByCareerPage /></RequireRole>} />
-        <Route path="/admin/students/:id" element={<RequireRole role="ROLE_ADMIN"><StudentDetailPage /></RequireRole>} />
-        <Route path="/admin/predefense" element={<RequireRole role="ROLE_ADMIN"><AdminPredefensePage /></RequireRole>} />
-        <Route path="/admin/final-defense" element={<RequireRole role="ROLE_ADMIN"><FinalDefenseAdminPage /></RequireRole>} />
+          {/* ADMIN */}
+          <Route path="/admin" element={<RequireRole role="ROLE_ADMIN"><AdminStudentsPage /></RequireRole>} />
+          <Route path="/admin/students/by-career" element={<RequireRole role="ROLE_ADMIN"><AdminStudentsByCareerPage /></RequireRole>} />
+          <Route path="/admin/students/:id" element={<RequireRole role="ROLE_ADMIN"><StudentDetailPage /></RequireRole>} />
+          <Route path="/admin/predefense" element={<RequireRole role="ROLE_ADMIN"><AdminPredefensePage /></RequireRole>} />
+          <Route path="/admin/final-defense" element={<RequireRole role="ROLE_ADMIN"><FinalDefenseAdminPage /></RequireRole>} />
 
-        {/* COORDINADOR */}
-        <Route path="/coordinator" element={<RequireRole role="ROLE_COORDINATOR"><CoordinatorStudentsPage /></RequireRole>} />
-        <Route path="/coordinator/students/:id" element={<RequireRole role="ROLE_COORDINATOR"><CoordinatorStudentDetailPage /></RequireRole>} />
+          {/* COORDINADOR */}
+          <Route path="/coordinator" element={<RequireRole role="ROLE_COORDINATOR"><CoordinatorStudentsPage /></RequireRole>} />
+          <Route path="/coordinator/students/:id" element={<RequireRole role="ROLE_COORDINATOR"><CoordinatorStudentDetailPage /></RequireRole>} />
 
-        {/* TUTOR */}
-        <Route path="/tutor" element={<RequireRole role="ROLE_TUTOR"><TutorStudentsPage /></RequireRole>} />
-        <Route path="/tutor/students/:id" element={<RequireRole role="ROLE_TUTOR"><TutorStudentDetailPage /></RequireRole>} />
+          {/* TUTOR */}
+          <Route path="/tutor" element={<RequireRole role="ROLE_TUTOR"><TutorStudentsPage /></RequireRole>} />
+          <Route path="/tutor/students/:id" element={<RequireRole role="ROLE_TUTOR"><TutorStudentDetailPage /></RequireRole>} />
 
-        {/* JURADO (ACEPTA TUTOR + COORDINADOR) */}
-        <Route
-          path="/jury/predefense"
-          element={
-            <RequireAnyRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
-              <JuryPredefensePage />
-            </RequireAnyRole>
-          }
-        />
-        <Route
-          path="/jury/final-defense"
-          element={
-            <RequireAnyRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
-              <FinalDefenseJuryPage />
-            </RequireAnyRole>
-          }
-        />
+          {/* JURADO (ACEPTA TUTOR + COORDINADOR) */}
+          <Route
+            path="/jury/predefense"
+            element={
+              <RequireAnyRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
+                <JuryPredefensePage />
+              </RequireAnyRole>
+            }
+          />
+          <Route
+            path="/jury/final-defense"
+            element={
+              <RequireAnyRole rolesAllowed={["ROLE_JURY", "ROLE_COORDINATOR", "ROLE_TUTOR"]}>
+                <FinalDefenseJuryPage />
+              </RequireAnyRole>
+            }
+          />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

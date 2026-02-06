@@ -21,80 +21,87 @@ import {
   Divider,
   Stack,
   Paper,
-  Tooltip,
+  Fade,
 } from "@mui/material";
 import {
-  Refresh as RefreshIcon,
   Logout as LogoutOutlined,
   Close as CloseIcon,
   PhotoCamera as PhotoCameraIcon,
-  Person as PersonIcon,
+  AccountCircle as AccountCircleIcon,
   Email as EmailIcon,
   Badge as BadgeIcon,
-  AccountCircle as AccountCircleIcon,
 } from "@mui/icons-material";
+
+// --- LÓGICA REACTIVA ---
+import { useQuery } from "@tanstack/react-query";
 
 import { logout } from "../services/authService";
 import type { TutorStudentRow } from "../services/tutorService";
 import { listTutorStudents } from "../services/tutorService";
 import { useActivePeriod } from "../hooks/useActivePeriod";
 
+// Componente Sidebar del Tutor
+import TutorSidebar from "../components/TutorSidebar/TutorSidebar";
+import type { UserResponse } from "../services/adminUserService";
+
 const VERDE_INSTITUCIONAL = "#008B8B";
 
 export default function TutorStudentsPage() {
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState<TutorStudentRow[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const nav = useNavigate();
   const ap = useActivePeriod();
 
+  // ESTADOS
+  const [drawerOpen, setDrawerOpen] = useState(false); 
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- ⚡ CAPA REACTIVA AUTOMÁTICA ---
+  const { data: rows = [], isLoading: loading } = useQuery<TutorStudentRow[]>({
+    queryKey: ["tutorStudents", ap.periodId],
+    queryFn: () => listTutorStudents(ap.periodId!),
+    enabled: !!ap.periodId,
+    refetchInterval: 5000, 
+    staleTime: 0,
+  });
+
+  // ✅ TutorInfo con validaciones de seguridad
   const tutorInfo = useMemo(() => {
     const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        return {
-          username: user.username || user.email?.split("@")[0] || "",
-          name: user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "",
-          email: user.email || "",
-          role: user.role || "Tutor",
-        };
-      } catch {
-        return { username: "", name: "", email: "", role: "Tutor" };
-      }
+    if (!userStr) return { username: "", name: "Usuario", email: "", role: "Tutor" };
+
+    try {
+      const user: UserResponse = JSON.parse(userStr);
+      const role = user.roles && user.roles.length > 0
+          ? user.roles[0].replace("ROLE_", "")
+          : "Tutor";
+
+      return {
+        username: user.username || "",
+        name: user.fullName || "Usuario",
+        email: user.email || "",
+        role,
+      };
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      return { username: "", name: "Usuario", email: "", role: "Tutor" };
     }
-    return { username: "", name: "", email: "", role: "Tutor" };
   }, []);
 
-  const load = async () => {
-    if (!ap.periodId) return;
-    setLoading(true);
-    try {
-      const data = await listTutorStudents(ap.periodId);
-      setRows(Array.isArray(data) ? data : []);
-    } catch (e: any) {
-      console.error("ERROR listTutorStudents:", e?.response?.data ?? e);
-      alert(e?.response?.data?.message ?? "No se pudo cargar estudiantes (TUTOR)");
-      if (e?.response?.status === 401 || e?.response?.status === 403) {
-        logout();
-        nav("/");
-      } else {
-        setRows([]);
-      }
-    } finally {
-      setLoading(false);
+  // 🔥 AJUSTE 1: Iniciales Dinámicas (2 letras)
+  const getInitials = () => {
+    const name = tutorInfo.name?.trim();
+    if (!name) return "U";
+    const parts = name.split(" ").filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     }
+    return parts[0][0].toUpperCase();
   };
 
   useEffect(() => {
-    load();
     const savedPhoto = localStorage.getItem("tutorPhoto");
     if (savedPhoto) setPhotoPreview(savedPhoto);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ap.periodId]);
+  }, []);
 
   const handleLogout = () => {
     if (!confirm("¿Estás seguro de que deseas cerrar sesión?")) return;
@@ -116,9 +123,9 @@ export default function TutorStudentsPage() {
   };
 
   const getStatusColor = (status: string) => {
-    if (status === "EN_CURSO") return "primary";
-    if (status === "REPROBADO") return "error";
-    return "success";
+    if (status === "EN_CURSO") return { bg: "#1976d2", text: "white" };
+    if (status === "REPROBADO") return { bg: "#d32f2f", text: "white" };
+    return { bg: "#2e7d32", text: "white" }; // APROBADO
   };
 
   if (ap.loading) return (
@@ -127,191 +134,193 @@ export default function TutorStudentsPage() {
     </Box>
   );
 
-  if (ap.error) return (
-    <Box sx={{ minHeight: "100vh", background: "#f0f2f5", p: 3 }}>
-      <Container maxWidth="sm">
-        <Card>
-          <CardContent sx={{ textAlign: "center", py: 4 }}>
-            <Typography variant="h5" color="error" gutterBottom>Error</Typography>
-            <Typography variant="body1">{ap.error}</Typography>
-          </CardContent>
-        </Card>
-      </Container>
-    </Box>
-  );
-
   return (
-    <Box sx={{ minHeight: "100vh", background: "#f0f2f5", display: "flex", flexDirection: "column" }}>
-      {/* HEADER */}
-      <Box sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", py: 2, px: 4, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-        <Container maxWidth="lg">
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f0f2f5" }}>
+      
+      {/* 🟢 Sidebar Panel Fijo (Como Coordinador) */}
+      <Box sx={{ width: 260, flexShrink: 0, borderRight: "1px solid #e1e8ed" }}>
+        <TutorSidebar 
+  onLogout={handleLogout}
+  verde={VERDE_INSTITUCIONAL}
+  periodId={ap.periodId}
+/>
+
+      </Box>
+
+      {/* Contenedor de Contenido */}
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        
+        {/* 🔥 Header con maxWidth y sin botón hamburguesa */}
+        <Box sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", py: 2, px: 3, boxShadow: 1 }}>
+          <Box sx={{ 
+            display: "flex", 
+            justifyContent: "space-between", 
+            alignItems: "center",
+            maxWidth: "1200px",
+            mx: "auto",
+            width: "100%"
+          }}>
             <Box>
-              <Typography variant="h5" sx={{ fontWeight: 900 }}>Mis Estudiantes</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                Listado general de estudiantes {ap.periodId ? `— Periodo: ${ap.periodId}` : ""}
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1 }}>
+                Mis Estudiantes
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                Listado general — Periodo: {ap.periodId || "16"}
               </Typography>
             </Box>
 
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-              <Button
-                variant="contained"
-                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-                onClick={load}
-                disabled={loading}
-                sx={{ bgcolor: "white", color: VERDE_INSTITUCIONAL, fontWeight: 900, "&:hover": { bgcolor: "#f5f5f5" }, borderRadius: "20px", textTransform: "none" }}
-              >
-                Refrescar
-              </Button>
-
-             <Button
-  variant="contained"
-  sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}
-  onClick={() => nav(`/tutor/predefense?periodId=${ap.periodId}`)}
->
-  Predefensa
-</Button>
-
-<Button
-  variant="contained"
-  sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}
-  onClick={() => nav(`/jury/final-defense?periodId=${ap.periodId}`)}
->
-  Defensa Final
-</Button>
-
-
-              <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: "white", "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}>
-                <Avatar src={photoPreview || undefined} sx={{ width: 40, height: 40, bgcolor: "white", color: VERDE_INSTITUCIONAL, fontWeight: 900 }}>
-                  {tutorInfo?.name?.charAt(0) || tutorInfo?.username?.charAt(0)?.toUpperCase() || "U"}
-                </Avatar>
-              </IconButton>
-            </Box>
+            <Avatar 
+              onClick={() => setDrawerOpen(true)}
+              src={photoPreview || undefined} 
+              sx={{ 
+                width: 38, height: 38, cursor: "pointer", 
+                border: "2px solid white", bgcolor: "white", 
+                color: VERDE_INSTITUCIONAL, fontSize: "0.95rem", fontWeight: 800,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+              }}
+            >
+              {getInitials()}
+            </Avatar>
           </Box>
-        </Container>
-      </Box>
+        </Box>
 
-      {/* CONTENIDO */}
-      <Box sx={{ flex: 1, py: 3 }}>
-        <Container maxWidth="lg">
-          <Card sx={{ borderRadius: 2, boxShadow: "0 4px 12px rgba(0,0,0,0.06)", borderLeft: `6px solid ${VERDE_INSTITUCIONAL}` }}>
-            <CardContent sx={{ p: 0 }}>
-              <Box sx={{ p: 2, borderBottom: "1px solid #eee" }}>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: VERDE_INSTITUCIONAL }}>Estudiantes Asignados</Typography>
-              </Box>
+        {/* CONTENIDO DE LA TABLA */}
+        <Box sx={{ flex: 1, py: 4 }}>
+          <Container maxWidth="lg">
+            <Fade in={!loading} timeout={500}>
+              <Card sx={{ 
+                borderRadius: "12px", 
+                boxShadow: "0 10px 30px rgba(0,0,0,0.06)", 
+                border: "1px solid #e1e8ed",
+                overflow: 'hidden'
+              }}>
+                <CardContent sx={{ p: 0 }}>
+                  <Box sx={{ p: 3, borderBottom: "1px solid #eee", bgcolor: "#fff" }}>
+                    <Typography variant="h6" sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL }}>
+                      Listado General
+                    </Typography>
+                  </Box>
 
-              {loading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-                  <CircularProgress sx={{ color: VERDE_INSTITUCIONAL }} />
-                </Box>
-              ) : (
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>Inicial</TableCell>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>DNI</TableCell>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}>Nombres</TableCell>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}>Apellidos</TableCell>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}>Carrera</TableCell>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900 }}>Proyecto</TableCell>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>Corte</TableCell>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>Sección</TableCell>
-                        <TableCell sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 900, textAlign: "center" }}>Estado</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {rows.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={9} align="center" sx={{ py: 4, color: "#777" }}>No hay estudiantes asignados</TableCell>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: VERDE_INSTITUCIONAL }}>
+                          {['Inicial', 'DNI', 'Nombres', 'Apellidos', 'Carrera', 'Corte', 'Sección', 'Estado'].map((head) => (
+                            <TableCell key={head} sx={{ color: "white", fontWeight: 800, fontSize: '0.85rem', py: 1.2, border: 'none' }} align="center">
+                              {head}
+                            </TableCell>
+                          ))}
                         </TableRow>
-                      ) : (
-                        rows.map((row) => (
-                          <TableRow key={row.id} onClick={() => nav(`/tutor/students/${row.id}?periodId=${ap.periodId ?? ""}`)} sx={{ cursor: "pointer", "&:hover": { bgcolor: "#f5f5f5" } }}>
-                            <TableCell align="center"><Avatar sx={{ bgcolor: VERDE_INSTITUCIONAL, width: 32, height: 32, fontSize: "0.875rem", mx: "auto" }}>{row.firstName?.charAt(0) || "?"}</Avatar></TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 600 }}>{row.dni}</TableCell>
-                            <TableCell>{row.firstName}</TableCell>
-                            <TableCell>{row.lastName}</TableCell>
-                            <TableCell>{row.career}</TableCell>
-                            <TableCell>{row.thesisProject || <Typography variant="body2" sx={{ color: "#999", fontStyle: "italic" }}>-</Typography>}</TableCell>
-                            <TableCell align="center">{row.corte}</TableCell>
-                            <TableCell align="center">{row.section}</TableCell>
-                            <TableCell align="center">
-                              <Chip label={row.status} color={getStatusColor(row.status)} size="small" sx={{ fontWeight: 900, fontSize: "0.75rem", borderRadius: "10px" }} />
+                      </TableHead>
+                      <TableBody>
+                        {rows.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} align="center" sx={{ py: 6, color: "#999", fontStyle: 'italic' }}>
+                              No hay estudiantes asignados en este periodo.
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
+                        ) : (
+                          rows.map((row) => {
+                            const statusStyle = getStatusColor(row.status);
+                            return (
+                              <TableRow 
+                                key={row.id} 
+                                hover
+                                onClick={() => nav(`/tutor/students/${row.id}`)}
+                                sx={{ cursor: "pointer", "&:hover": { bgcolor: "#f8f9fa" }, transition: '0.2s' }}
+                              >
+                                <TableCell align="center">
+                                  <Avatar sx={{ bgcolor: VERDE_INSTITUCIONAL, width: 30, height: 30, fontSize: "0.8rem", mx: "auto", fontWeight: 700 }}>
+                                    {row.firstName?.charAt(0) || "E"}
+                                  </Avatar>
+                                </TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{row.dni}</TableCell>
+                                <TableCell align="center" sx={{ fontSize: '0.85rem' }}>{row.firstName}</TableCell>
+                                <TableCell align="center" sx={{ fontSize: '0.85rem' }}>{row.lastName}</TableCell>
+                                <TableCell align="center" sx={{ fontSize: '0.85rem', color: '#666' }}>{row.career}</TableCell>
+                                <TableCell align="center" sx={{ fontSize: '0.85rem', color: '#777' }}>{row.corte || "-"}</TableCell>
+                                <TableCell align="center" sx={{ fontSize: '0.85rem' }}>{row.section || "MATUTINA"}</TableCell>
+                                <TableCell align="center">
+                                  <Chip 
+                                    label={row.status} 
+                                    size="small"
+                                    sx={{ 
+                                      bgcolor: statusStyle.bg, 
+                                      color: statusStyle.text,
+                                      fontWeight: 900, 
+                                      fontSize: '0.65rem',
+                                      borderRadius: "8px",
+                                      height: 20
+                                    }} 
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </Card>
+            </Fade>
+          </Container>
+        </Box>
 
-              <Box sx={{ p: 2, textAlign: "center", borderTop: "1px solid #eee" }}>
-                <Typography variant="body2" sx={{ color: "#777", fontStyle: "italic" }}>
-                  Haz click en un estudiante para gestionar sus incidencias y observaciones.
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Container>
+        {/* FOOTER */}
+        <Box sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", py: 1.5, textAlign: "center" }}>
+          <Typography variant="caption" sx={{ fontWeight: 500 }}>
+            © 2025 - Panel de Coordinación
+          </Typography>
+        </Box>
       </Box>
 
-      {/* FOOTER */}
-      <Box sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", py: 2, textAlign: "center" }}>
-        <Typography variant="body2">© 2025 - Panel de Predefensas</Typography>
-      </Box>
-
-      {/* DRAWER */}
-      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 360 }, bgcolor: "rgba(255,255,255,0.98)", backdropFilter: "blur(10px)", height: "calc(100vh - 56px)", top: 0 } }}
+      {/* DRAWER PERFIL (DERECHA) */}
+      <Drawer 
+        anchor="right" 
+        open={drawerOpen} 
+        onClose={() => setDrawerOpen(false)}
+        PaperProps={{ sx: { width: 340, bgcolor: "rgba(255, 255, 255, 0.98)", backdropFilter: "blur(8px)" } }}
       >
         <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
           <Box sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #eee" }}>
             <Typography variant="h6" sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL }}>Mi Perfil</Typography>
-            <Box sx={{ display: "flex", gap: 0.5 }}>
-              <Tooltip title="Cerrar Sesión" arrow>
-                <IconButton onClick={handleLogout} size="small" sx={{ color: "#d32f2f", "&:hover": { bgcolor: "rgba(211, 47, 47, 0.08)" } }}>
-                  <LogoutOutlined fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <IconButton onClick={() => setDrawerOpen(false)} size="small"><CloseIcon fontSize="small" /></IconButton>
-            </Box>
+            <IconButton onClick={() => setDrawerOpen(false)}><CloseIcon /></IconButton>
           </Box>
 
-          <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
-            <Box sx={{ textAlign: "center", mb: 2.5 }}>
-              <Avatar src={photoPreview || undefined} sx={{ width: 90, height: 90, fontSize: "2.2rem", mx: "auto", mb: 1.5, bgcolor: VERDE_INSTITUCIONAL, border: "3px solid #f0f2f5" }}>
-                {tutorInfo?.name?.charAt(0) || tutorInfo?.username?.charAt(0)?.toUpperCase() || "U"}
-              </Avatar>
-              <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/*" style={{ display: "none" }} />
-              <Button variant="text" startIcon={<PhotoCameraIcon fontSize="small" />} onClick={() => fileInputRef.current?.click()} sx={{ color: VERDE_INSTITUCIONAL, textTransform: "none", fontWeight: 600, fontSize: "0.75rem", "&:hover": { bgcolor: "rgba(0, 139, 139, 0.05)" } }}>Cambiar Foto</Button>
-            </Box>
+          <Box sx={{ flex: 1, p: 3, textAlign: 'center' }}>
+            <Avatar
+              src={photoPreview || undefined}
+              sx={{ width: 90, height: 90, mx: "auto", mb: 2, bgcolor: VERDE_INSTITUCIONAL, border: "4px solid #f0f2f5", fontSize: "2rem", fontWeight: 800 }}
+            >
+              {getInitials()}
+            </Avatar>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{tutorInfo.name}</Typography>
+            <Chip label={tutorInfo.role} size="small" sx={{ mt: 1, bgcolor: VERDE_INSTITUCIONAL, color: 'white', fontWeight: 700, height: 20, fontSize: '0.65rem' }} />
+            
+            <Divider sx={{ my: 3 }} />
 
-            <Stack spacing={1.2}>
-              {["username", "name", "email", "role"].map((field) => (
-                <Paper key={field} elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248,249,250,0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                    {{
-                      username: <AccountCircleIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />,
-                      name: <PersonIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />,
-                      email: <EmailIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />,
-                      role: <BadgeIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />,
-                    }[field]}
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>{field.charAt(0).toUpperCase() + field.slice(1)}</Typography>
-                      {field === "role" ? (
-                        <Chip label={tutorInfo?.role || "Sin asignar"} size="small" sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 700, fontSize: "0.7rem", height: "22px" }} />
-                      ) : (
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: tutorInfo?.[field as keyof typeof tutorInfo] ? "#212529" : "#adb5bd", fontSize: "0.813rem" }}>
-                          {tutorInfo?.[field as keyof typeof tutorInfo] || "Sin asignar"}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                </Paper>
-              ))}
+            <Stack spacing={2}>
+              <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "12px", textAlign: 'left', bgcolor: '#fafafa' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.65rem' }}>USUARIO</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{tutorInfo.username}</Typography>
+              </Paper>
+              <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "12px", textAlign: 'left', bgcolor: '#fafafa' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.65rem' }}>CORREO</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>{tutorInfo.email}</Typography>
+              </Paper>
             </Stack>
+
+            <Button 
+              fullWidth 
+              variant="contained" 
+              color="error" 
+              onClick={handleLogout} 
+              sx={{ mt: 4, borderRadius: '10px', py: 1.2, fontWeight: 800, textTransform: 'none' }}
+              startIcon={<LogoutOutlined />}
+            >
+              Cerrar Sesión
+            </Button>
           </Box>
         </Box>
       </Drawer>

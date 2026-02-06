@@ -23,6 +23,9 @@ import {
 } from "@ant-design/icons";
 import { logout } from "../services/authService";
 
+// ✅ IMPORTES PARA REACTIVIDAD
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 // ✅ modal email
 import SendEmailModal from "../components/SendEmailModal";
 
@@ -75,6 +78,7 @@ export default function StudentDetailPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [sp] = useSearchParams();
+  const queryClient = useQueryClient();
 
   // ✅ periodId: query -> localStorage -> null
   const periodIdFromUrlOrLs = useMemo(() => {
@@ -87,8 +91,6 @@ export default function StudentDetailPage() {
     return null;
   }, [sp]);
 
-  const [data, setData] = useState<StudentDetailDto | null>(null);
-  const [loading, setLoading] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
 
   // ✅ editar incidencia
@@ -99,10 +101,7 @@ export default function StudentDetailPage() {
   const [resolvedPeriodId, setResolvedPeriodId] = useState<number | null>(periodIdFromUrlOrLs);
 
   const resolvePeriod = async () => {
-    // si ya hay, úsalo
     if (resolvedPeriodId) return resolvedPeriodId;
-
-    // intenta recuperar del backend (si existe el endpoint)
     try {
       const p = await getActiveAcademicPeriod();
       if (p?.id) {
@@ -110,65 +109,61 @@ export default function StudentDetailPage() {
         setResolvedPeriodId(p.id);
         return p.id;
       }
-    } catch {
-      // si no tienes ese endpoint o falla, no rompas la app
-    }
+    } catch { }
     return null;
   };
 
-  /* LÓGICA DE CARGA */
-  const load = async () => {
-    if (!id) return;
-    setLoading(true);
+  /* ===================== LÓGICA REACTIVA (Queries & Mutations) ===================== */
 
-    try {
+  // Mantenemos el nombre 'data' y 'loading' para no romper tu diseño de abajo
+  const { data, isLoading: loading, refetch: load } = useQuery<StudentDetailDto | null>({
+    queryKey: ["studentDetail", id, resolvedPeriodId],
+    queryFn: async () => {
+      if (!id) return null;
       const pid = await resolvePeriod();
       
-      // ✅ CRÍTICO: Si no hay periodo, mostramos advertencia
       if (!pid) {
         message.warning("No hay período académico activo. Las incidencias/observaciones requieren un período activo.");
-        setLoading(false);
-        return;
+        return null;
       }
 
-      console.log("🔍 Admin cargando estudiante con periodId:", pid); // ← Debug
+      console.log("🔍 Admin cargando estudiante con periodId:", pid);
 
-      // ✅ SIEMPRE mandamos el periodId como parámetro
       const res = await api.get<StudentDetailDto>(`/admin/students/${id}`, {
         params: { periodId: pid },
       });
 
-      console.log("✅ Respuesta del backend:", res.data); // ← Debug
+      console.log("✅ Respuesta del backend:", res.data);
 
-      const formattedData: StudentDetailDto = {
+      return {
         ...res.data,
         incidents: res.data.incidents || [],
         observations: res.data.observations || [],
       };
+    },
+    enabled: !!id,
+    retry: false,
+  });
 
-      setData(formattedData);
-    } catch (e: any) {
-      console.error("❌ Error al cargar:", e?.response?.data ?? e);
-      message.error(e?.response?.data?.message ?? "No se pudo cargar el detalle del alumno");
-
-      if (e?.response?.status === 401 || e?.response?.status === 403) {
-        logout();
-        nav("/");
-      }
-    } finally {
-      setLoading(false);
+  // Mutación para borrar sin recargar página
+  const deleteMutation = useMutation({
+    mutationFn: ({ studentId, incidentId, pid }: { studentId: number, incidentId: number, pid: number }) =>
+      deleteIncident(studentId, incidentId, pid),
+    onSuccess: (res) => {
+      message.success(`Incidencia eliminada ✅ (Estado: ${res?.studentStatus ?? "OK"})`);
+      // Esto hace que la data se refresque sola
+      queryClient.invalidateQueries({ queryKey: ["studentDetail", id] });
+    },
+    onError: (e: any) => {
+      message.error(e?.response?.data?.message ?? "No se pudo eliminar");
     }
-  };
+  });
+
+  /* ===================== EFECTOS ===================== */
 
   useEffect(() => {
-    // si cambió el periodId (query/localStorage), lo reflejamos
     setResolvedPeriodId(periodIdFromUrlOrLs);
   }, [periodIdFromUrlOrLs]);
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, resolvedPeriodId]);
 
   const handleLogout = () => {
     logout();
@@ -192,7 +187,7 @@ export default function StudentDetailPage() {
           Panel Administrativo · Historial Académico
         </Title>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={load} loading={loading} style={{ borderRadius: "20px" }} />
+          <Button icon={<ReloadOutlined />} onClick={() => load()} loading={loading} style={{ borderRadius: "20px" }} />
           <Button
             icon={<LogoutOutlined />}
             onClick={handleLogout}
@@ -349,23 +344,15 @@ export default function StudentDetailPage() {
                                         description="Si el estudiante queda con menos de 3 incidencias, vuelve a EN_CURSO."
                                         okText="Eliminar"
                                         cancelText="Cancelar"
-                                        onConfirm={async () => {
+                                        onConfirm={() => {
                                           if (!pid || !data?.id) {
                                             message.warning("Falta periodId activo.");
                                             return;
                                           }
-                                          try {
-                                            const res = await deleteIncident(data.id, inc.id, pid);
-                                            message.success(
-                                              `Incidencia eliminada ✅ (Estado: ${res?.studentStatus ?? "OK"})`
-                                            );
-                                            load(); // recargar detalle
-                                          } catch (e: any) {
-                                            message.error(e?.response?.data?.message ?? "No se pudo eliminar");
-                                          }
+                                          deleteMutation.mutate({ studentId: data.id, incidentId: inc.id, pid });
                                         }}
                                       >
-                                        <Button size="small" danger icon={<DeleteOutlined />} />
+                                        <Button size="small" danger icon={<DeleteOutlined />} loading={deleteMutation.isPending} />
                                       </Popconfirm>
                                     </Space>
                                   );
@@ -430,7 +417,7 @@ export default function StudentDetailPage() {
         <EditIncidentModal
           open={editIncOpen}
           onClose={() => setEditIncOpen(false)}
-          onSaved={load}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: ["studentDetail", id] })}
           periodId={(resolvedPeriodId || Number(localStorage.getItem("periodId")))!}
           studentId={data.id}
           incident={editingIncident}

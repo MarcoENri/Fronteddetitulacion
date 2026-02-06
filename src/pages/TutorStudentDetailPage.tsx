@@ -28,9 +28,9 @@ import {
   TextField,
   Tab,
   Tabs,
+  CircularProgress,
 } from "@mui/material";
 import {
-  ArrowBack as ArrowBackIcon,
   Email as EmailIcon,
   Add as AddIcon,
   Edit as EditIcon,
@@ -41,10 +41,14 @@ import {
   Badge as BadgeIcon,
   AccountCircle as AccountCircleIcon,
   Logout as LogoutOutlined,
+  Menu as MenuIcon,
 } from "@mui/icons-material";
 import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
+
+// 🔥 PROGRAMACIÓN REACTIVA
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { logout } from "../services/authService";
 import {
@@ -56,6 +60,7 @@ import { deleteIncident } from "../services/incidentManageService";
 import type { StudentDetailDto } from "../services/tutorService";
 import SendEmailModal from "../components/SendEmailModal";
 import EditIncidentModal from "../components/EditIncidentModal";
+import TutorSidebar from "../components/TutorSidebar/TutorSidebar";
 
 const VERDE_INSTITUCIONAL = "#008B8B";
 
@@ -78,8 +83,10 @@ export default function TutorStudentDetailPage() {
   const nav = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [sp] = useSearchParams();
+  const queryClient = useQueryClient();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,36 +118,14 @@ export default function TutorStudentDetailPage() {
     return { username: "", name: "", email: "", role: "Tutor" };
   }, []);
 
-  const [data, setData] = useState<StudentDetailDto | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [tabValue, setTabValue] = useState(0);
-
-  const [incidentOpen, setIncidentOpen] = useState(false);
-  const [obsOpen, setObsOpen] = useState(false);
-  const [emailOpen, setEmailOpen] = useState(false);
-  const [editIncOpen, setEditIncOpen] = useState(false);
-  const [editingIncident, setEditingIncident] = useState<any>(null);
-
-  // Form states para incidencia
-  const [incStage, setIncStage] = useState("");
-  const [incDate, setIncDate] = useState<dayjs.Dayjs | null>(null);
-  const [incReason, setIncReason] = useState("");
-  const [incAction, setIncAction] = useState("");
-
-  // Form state para observación
-  const [obsText, setObsText] = useState("");
-
-  const load = async () => {
-    if (!id) return;
-
-    if (!periodId) {
-      alert("Falta periodId. Regresando al listado...");
-      nav("/tutor", { replace: true });
-      return;
-    }
-
-    setLoading(true);
-    try {
+  // 🔥 QUERY REACTIVA AUTOMÁTICA
+  const { data, isLoading, error } = useQuery<StudentDetailDto>({
+    queryKey: ["tutorStudentDetail", id, periodId],
+    queryFn: async () => {
+      if (!id || !periodId) {
+        throw new Error("Falta ID o periodId");
+      }
+      
       console.log("═══════════════════════════════════════");
       console.log("🔍 TUTOR - Cargando estudiante");
       console.log("   StudentId:", id);
@@ -157,31 +142,46 @@ export default function TutorStudentDetailPage() {
       });
       console.log("   - Incidencias:", res.incidents?.length || 0, "encontradas");
       console.log("   - Observaciones:", res.observations?.length || 0, "encontradas");
-      console.log("   - Incidencias RAW:", JSON.stringify(res.incidents, null, 2));
-      console.log("   - Observaciones RAW:", JSON.stringify(res.observations, null, 2));
       console.log("═══════════════════════════════════════");
 
-      setData(res);
-    } catch (e: any) {
-      console.error("❌ ERROR AL CARGAR (TUTOR):");
-      console.error("   Status:", e?.response?.status);
-      console.error("   Data:", e?.response?.data);
-      console.error("   Full error:", e);
-      alert(e?.response?.data?.message ?? "No se pudo cargar el estudiante");
-      nav("/tutor", { replace: true });
-    } finally {
-      setLoading(false);
-    }
-  };
+      return res;
+    },
+    enabled: !!id && !!periodId,
+    refetchInterval: 3000, // Refresco automático cada 3 segundos
+    staleTime: 0,
+    refetchIntervalInBackground: true,
+  });
+
+  const [tabValue, setTabValue] = useState(0);
+  const [incidentOpen, setIncidentOpen] = useState(false);
+  const [obsOpen, setObsOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [editIncOpen, setEditIncOpen] = useState(false);
+  const [editingIncident, setEditingIncident] = useState<any>(null);
+
+  // Form states para incidencia
+  const [incStage, setIncStage] = useState("");
+  const [incDate, setIncDate] = useState<dayjs.Dayjs | null>(null);
+  const [incReason, setIncReason] = useState("");
+  const [incAction, setIncAction] = useState("");
+
+  // Form state para observación
+  const [obsText, setObsText] = useState("");
 
   useEffect(() => {
-    load();
     const savedPhoto = localStorage.getItem("tutorPhoto");
     if (savedPhoto) {
       setPhotoPreview(savedPhoto);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, periodId]);
+  }, []);
+
+  useEffect(() => {
+    if (error) {
+      console.error("❌ ERROR AL CARGAR (TUTOR):", error);
+      alert("No se pudo cargar el estudiante");
+      nav("/tutor/students", { replace: true });
+    }
+  }, [error, nav]);
 
   const handleLogout = () => {
     if (!confirm("¿Estás seguro de que deseas cerrar sesión?")) return;
@@ -221,7 +221,9 @@ export default function TutorStudentDetailPage() {
       setIncDate(null);
       setIncReason("");
       setIncAction("");
-      load();
+      
+      // 🔥 Invalidar query para recargar datos
+      queryClient.invalidateQueries({ queryKey: ["tutorStudentDetail", id, periodId] });
     } catch (e: any) {
       alert(e?.response?.data?.message ?? "No se pudo registrar incidencia");
     }
@@ -238,7 +240,9 @@ export default function TutorStudentDetailPage() {
       alert("Observación registrada");
       setObsOpen(false);
       setObsText("");
-      load();
+      
+      // 🔥 Invalidar query para recargar datos
+      queryClient.invalidateQueries({ queryKey: ["tutorStudentDetail", id, periodId] });
     } catch (e: any) {
       alert(e?.response?.data?.message ?? "No se pudo registrar observación");
     }
@@ -251,17 +255,17 @@ export default function TutorStudentDetailPage() {
     try {
       const res = await deleteIncident(data.id, incId, periodId);
       alert(`Eliminada ✅ (Estado: ${res?.studentStatus ?? "OK"})`);
-      load();
+      
+      // 🔥 Invalidar query para recargar datos
+      queryClient.invalidateQueries({ queryKey: ["tutorStudentDetail", id, periodId] });
     } catch (e: any) {
       alert(e?.response?.data?.message ?? "No se pudo eliminar");
     }
   };
 
-  // Función para formatear fecha sin hora
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
     try {
-      // Si viene con hora (formato ISO), la cortamos
       const dateOnly = dateString.split("T")[0];
       const [year, month, day] = dateOnly.split("-");
       return `${day}/${month}/${year}`;
@@ -270,12 +274,31 @@ export default function TutorStudentDetailPage() {
     }
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <CircularProgress sx={{ color: VERDE_INSTITUCIONAL }} />
+      </Box>
+    );
+  }
+
   if (!data) return null;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box sx={{ minHeight: "100vh", background: "#f0f2f5", display: "flex", flexDirection: "column" }}>
-        {/* HEADER VERDE SUPERIOR - Elementos en las esquinas */}
+        
+        {/* SIDEBAR DE NAVEGACIÓN (IZQUIERDA) */}
+        <TutorSidebar 
+          open={sidebarOpen} 
+          onClose={() => setSidebarOpen(false)} 
+          onLogout={handleLogout}
+          verde={VERDE_INSTITUCIONAL}
+          periodId={periodId}
+        />
+
+        {/* HEADER VERDE SUPERIOR */}
         <Box
           sx={{
             bgcolor: VERDE_INSTITUCIONAL,
@@ -293,51 +316,55 @@ export default function TutorStudentDetailPage() {
               maxWidth: "100%",
             }}
           >
-            {/* ESQUINA IZQUIERDA: Panel de Tutoría */}
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
-                Panel de Tutoría
-              </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                Seguimiento del estudiante
-              </Typography>
-            </Box>
-
-            {/* ESQUINA DERECHA: Botón Volver + Avatar */}
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-              <IconButton
-                onClick={() => nav("/tutor")}
-                sx={{
-                  color: "white",
-                  bgcolor: "rgba(255, 255, 255, 0.2)",
-                  "&:hover": { bgcolor: "rgba(255, 255, 255, 0.3)" },
+            {/* ESQUINA IZQUIERDA: Menú Hamburguesa + Título */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <IconButton 
+                onClick={() => setSidebarOpen(true)} 
+                sx={{ 
+                  color: 'white', 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } 
                 }}
               >
-                <ArrowBackIcon />
+                <MenuIcon />
               </IconButton>
+              
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                  Panel de Tutoría
+                </Typography>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                  Seguimiento del estudiante
+                </Typography>
+              </Box>
+            </Box>
 
-              <IconButton
-                onClick={() => setDrawerOpen(true)}
+            {/* ESQUINA DERECHA: Solo Avatar */}
+            <IconButton
+              onClick={() => setDrawerOpen(true)}
+              sx={{
+                color: "white",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                p: 0,
+              }}
+            >
+              <Avatar
+                src={photoPreview || undefined}
                 sx={{
-                  color: "white",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-                  p: 0,
+                  width: 40,
+                  height: 40,
+                  bgcolor: "white",
+                  color: VERDE_INSTITUCIONAL,
+                  fontWeight: 900,
+                  '&:hover': {
+                    transform: 'scale(1.05)',
+                    transition: 'transform 0.2s ease'
+                  }
                 }}
               >
-                <Avatar
-                  src={photoPreview || undefined}
-                  sx={{
-                    width: 40,
-                    height: 40,
-                    bgcolor: "white",
-                    color: VERDE_INSTITUCIONAL,
-                    fontWeight: 900,
-                  }}
-                >
-                  {tutorInfo?.name?.charAt(0) || tutorInfo?.username?.charAt(0)?.toUpperCase() || "U"}
-                </Avatar>
-              </IconButton>
-            </Box>
+                {tutorInfo?.name?.charAt(0) || tutorInfo?.username?.charAt(0)?.toUpperCase() || "U"}
+              </Avatar>
+            </IconButton>
           </Box>
         </Box>
 
@@ -1004,7 +1031,7 @@ export default function TutorStudentDetailPage() {
         <EditIncidentModal
           open={editIncOpen}
           onClose={() => setEditIncOpen(false)}
-          onSaved={load}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: ["tutorStudentDetail", id, periodId] })}
           periodId={periodId!}
           studentId={data.id}
           incident={editingIncident}

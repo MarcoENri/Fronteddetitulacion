@@ -1,12 +1,12 @@
 // src/components/AssignCareerModal.tsx
-import { Modal, Form, Select, Input, Switch, message } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { Modal, Form, Select, message } from "antd";
+import { useMemo } from "react";
+// ✅ IMPORTES REACTIVOS
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { UserOption, CareerOption } from "../services/adminLookupService";
 import { listUsersByRole, listCareers } from "../services/adminLookupService";
-
-import { assignByCareer } from "../services/adminAssignService"; // ✅ CAMBIO: antes assignCareer
-
+import { assignByCareer } from "../services/adminAssignService";
 import { useActivePeriod } from "../hooks/useActivePeriod";
 
 type CareerItem = {
@@ -19,11 +19,11 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  availableCareers: CareerItem[]; // solo para “bonito”, NO para enviar al backend
+  availableCareers: CareerItem[];
 };
 
 type FormValues = {
-  careerId: number; // ✅ ID real (Long)
+  careerId: number;
   coordinatorId: number;
   tutorId?: number;
   projectName?: string;
@@ -37,80 +37,77 @@ export default function AssignCareerModal({
   availableCareers,
 }: Props) {
   const [form] = Form.useForm<FormValues>();
-  const [loading, setLoading] = useState(false);
-
-  const [coordinators, setCoordinators] = useState<UserOption[]>([]);
-  const [tutors, setTutors] = useState<UserOption[]>([]);
-  const [careers, setCareers] = useState<CareerOption[]>([]);
-
+  const queryClient = useQueryClient();
   const activePeriod = useActivePeriod();
 
-  // prioridad “bonita” para que carreras de tus tarjetas aparezcan primero
+  // -------------------------
+  // ✅ QUERIES (Carga de selectores)
+  // -------------------------
+
+  const { data: coordinators = [] } = useQuery({
+    queryKey: ["lookup-coordinators"],
+    queryFn: () => listUsersByRole("COORDINATOR"),
+    enabled: open,
+  });
+
+  const { data: careersRaw = [] } = useQuery({
+    queryKey: ["lookup-careers"],
+    queryFn: listCareers,
+    enabled: open,
+  });
+
+  // Prioridad “bonita” mantenida exacta
   const careerPriority = useMemo(() => {
     return new Set((availableCareers ?? []).map((c) => c.key.toLowerCase().trim()));
   }, [availableCareers]);
 
-  useEffect(() => {
-    if (!open) return;
+  // Ordenamiento de carreras mantenido exacto
+  const sortedCareers = useMemo(() => {
+    return [...careersRaw].sort((a, b) => {
+      const aKey = a.name.toLowerCase().trim();
+      const bKey = b.name.toLowerCase().trim();
+      const aP = careerPriority.has(aKey) ? 0 : 1;
+      const bP = careerPriority.has(bKey) ? 0 : 1;
+      if (aP !== bP) return aP - bP;
+      return a.name.localeCompare(b.name);
+    });
+  }, [careersRaw, careerPriority]);
 
-    (async () => {
-      try {
-        const [coords, tuts, cars] = await Promise.all([
-          listUsersByRole("COORDINATOR"),
-          listUsersByRole("TUTOR"),
-          listCareers(),
-        ]);
+  // -------------------------
+  // ✅ MUTATION (Guardado reactivo)
+  // -------------------------
 
-        setCoordinators(coords);
-        setTutors(tuts);
-
-        const sorted = [...cars].sort((a, b) => {
-          const aKey = a.name.toLowerCase().trim();
-          const bKey = b.name.toLowerCase().trim();
-          const aP = careerPriority.has(aKey) ? 0 : 1;
-          const bP = careerPriority.has(bKey) ? 0 : 1;
-          if (aP !== bP) return aP - bP;
-          return a.name.localeCompare(b.name);
-        });
-
-        setCareers(sorted);
-
-        form.setFieldsValue({ onlyUnassigned: true });
-      } catch (e: any) {
-        message.error(e?.response?.data?.message ?? "No se pudo cargar datos");
+  const assignMutation = useMutation({
+    mutationFn: (values: FormValues) => {
+      if (!activePeriod.periodId) {
+        throw new Error(activePeriod.error ?? "No hay periodo activo.");
       }
-    })();
-  }, [open, form, careerPriority]);
+      return assignByCareer({
+        ...values,
+        academicPeriodId: activePeriod.periodId,
+        projectName: values.projectName?.trim() || null,
+        tutorId: values.tutorId ?? null,
+      });
+    },
+    onSuccess: () => {
+      message.success("Asignación masiva aplicada ✅");
+      // ESTO ES LO REACTIVO: Invalida las listas para que se refresquen solas
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      onSuccess();
+      onClose();
+      form.resetFields();
+    },
+    onError: (e: any) => {
+      message.error(e?.response?.data?.message ?? "Error en asignación masiva");
+    },
+  });
 
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
-      setLoading(true);
-
-      // ✅ periodo activo obligatorio (para asignar por periodo)
-      if (!activePeriod.periodId) {
-        message.error(activePeriod.error ?? "No hay periodo activo. Activa uno primero.");
-        return;
-      }
-
-      await assignByCareer({
-        careerId: values.careerId, // ✅ number
-        coordinatorId: values.coordinatorId,
-        tutorId: values.tutorId ?? null,
-        projectName: values.projectName?.trim() ? values.projectName.trim() : null,
-        onlyUnassigned: values.onlyUnassigned,
-        academicPeriodId: activePeriod.periodId, // ✅ clave
-      });
-
-      message.success("Asignación masiva aplicada ✅");
-      onSuccess();
-      onClose();
-      form.resetFields();
-    } catch (e: any) {
-      if (e?.errorFields) return;
-      message.error(e?.response?.data?.message ?? "Error en asignación masiva");
-    } finally {
-      setLoading(false);
+      assignMutation.mutate(values);
+    } catch (e) {
+      // Errores de validación de antd
     }
   };
 
@@ -119,7 +116,7 @@ export default function AssignCareerModal({
       title="Asignación masiva por carrera"
       open={open}
       onOk={handleOk}
-      okButtonProps={{ loading }}
+      confirmLoading={assignMutation.isPending}
       onCancel={() => {
         onClose();
         form.resetFields();
@@ -128,7 +125,11 @@ export default function AssignCareerModal({
       okText="OK"
       cancelText="Cancelar"
     >
-      <Form layout="vertical" form={form}>
+      <Form 
+        layout="vertical" 
+        form={form}
+        initialValues={{ onlyUnassigned: true }}
+      >
         <Form.Item
           label="Carrera"
           name="careerId"
@@ -137,9 +138,9 @@ export default function AssignCareerModal({
           <Select
             showSearch
             optionFilterProp="label"
-            options={careers.map((c) => ({
-              value: c.id,   // ✅ ID real
-              label: c.name, // 👁️ texto
+            options={sortedCareers.map((c) => ({
+              value: c.id,
+              label: c.name,
             }))}
             placeholder="Selecciona carrera"
           />
@@ -160,8 +161,6 @@ export default function AssignCareerModal({
             placeholder="Selecciona coordinador"
           />
         </Form.Item>
-
-  
 
         <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
           <b>Periodo activo:</b>{" "}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Container,
@@ -19,9 +19,8 @@ import {
   Stack,
   Paper,
   Tooltip,
-  AppBar,
-  Toolbar,
 } from "@mui/material";
+
 import {
   Logout as LogoutOutlined,
   Close as CloseIcon,
@@ -33,9 +32,12 @@ import {
   Download as DownloadIcon,
   Visibility as VisibilityIcon,
   Assessment as AssessmentIcon,
-  ArrowBackIosNewRounded as ArrowBackIosNewRoundedIcon,
 } from "@mui/icons-material";
+
 import { useNavigate } from "react-router-dom";
+
+// 🟢 PASO 1 — Importar el tipo de usuario correcto
+import type { UserResponse } from "../services/adminUserService";
 
 import {
   juryFinalMyBookings,
@@ -46,43 +48,66 @@ import {
   type FinalDefenseBookingDto,
   type FinalDefenseEvaluationDto,
 } from "../services/finalDefenseService";
+import CoordinatorSidebar from "../components/Coordinatorsidebar/Coordinatorsidebar";
+import TutorSidebar from "../components/TutorSidebar/TutorSidebar";
+
 
 const VERDE_INSTITUCIONAL = "#008B8B";
 
+type StudentEvalState = {
+  rubricScore: number;
+  extraScore: number;
+  observations: string;
+};
+
 export default function FinalDefenseJuryPage() {
   const nav = useNavigate();
+
   const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [bookings, setBookings] = useState<FinalDefenseBookingDto[]>([]);
-
   const [openEval, setOpenEval] = useState(false);
   const [activeBooking, setActiveBooking] = useState<FinalDefenseBookingDto | null>(null);
   const [evaluations, setEvaluations] = useState<FinalDefenseEvaluationDto[]>([]);
 
-  const [rubricScore, setRubricScore] = useState<number>(0);
-  const [extraScore, setExtraScore] = useState<number>(0);
-  const [observations, setObservations] = useState("");
+  const [studentEvals, setStudentEvals] = useState<Record<number, StudentEvalState>>({});
   const [error, setError] = useState("");
 
+  // Detectar si es coordinador
+  const isCoordinator = useMemo(() => {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) return false;
+    try {
+      const user = JSON.parse(userStr);
+      const roles = user.roles || [];
+      return roles.some((r: string) => r.includes("COORDINATOR") || r.includes("ADMIN"));
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // 🟢 PASO 2 — Reemplazo de juryInfo para usar fullName y UserResponse
   const juryInfo = useMemo(() => {
     const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        return {
-          username: user.username || user.email?.split("@")[0] || "",
-          name: user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "",
-          email: user.email || "",
-          role: user.role || "Jurado",
-        };
-      } catch {
-        return { username: "", name: "", email: "", role: "Jurado" };
-      }
+
+    if (!userStr) {
+      return { username: "", name: "", email: "", role: "Jurado" };
     }
-    return { username: "", name: "", email: "", role: "Jurado" };
+
+    try {
+      const user: UserResponse = JSON.parse(userStr);
+
+      return {
+        username: user.username,
+        name: user.fullName ?? "",
+        email: user.email ?? "",
+        role: (user.roles && user.roles[0]) ? user.roles[0].replace("ROLE_", "") : "Jurado",
+      };
+    } catch {
+      return { username: "", name: "", email: "", role: "Jurado" };
+    }
   }, []);
 
   const periodId = useMemo(() => {
@@ -91,9 +116,6 @@ export default function FinalDefenseJuryPage() {
     const n = Number(ls);
     return Number.isFinite(n) ? n : null;
   }, []);
-
-  const total = Math.max(0, Math.min(100, (Number(rubricScore) || 0) + (Number(extraScore) || 0)));
-  const autoVerdict = total >= 70 ? "APROBADO" : "REPROBADO";
 
   const load = async () => {
     setLoading(true);
@@ -107,12 +129,10 @@ export default function FinalDefenseJuryPage() {
 
   useEffect(() => {
     load();
-    const savedPhoto = localStorage.getItem("juryPhoto");
-    if (savedPhoto) {
-      setPhotoPreview(savedPhoto);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const photoKey = isCoordinator ? "coordinatorPhoto" : "juryPhoto";
+    const savedPhoto = localStorage.getItem(photoKey);
+    if (savedPhoto) setPhotoPreview(savedPhoto);
+  }, [isCoordinator]);
 
   const handleLogout = () => {
     if (!confirm("¿Cerrar sesión?")) return;
@@ -120,17 +140,8 @@ export default function FinalDefenseJuryPage() {
     nav("/");
   };
 
-  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const photoData = reader.result as string;
-        setPhotoPreview(photoData);
-        localStorage.setItem("juryPhoto", photoData);
-      };
-      reader.readAsDataURL(file);
-    }
+  const handlePhotoChange = (photoData: string) => {
+    setPhotoPreview(photoData);
   };
 
   const openEvaluate = async (b: FinalDefenseBookingDto) => {
@@ -138,48 +149,52 @@ export default function FinalDefenseJuryPage() {
     setOpenEval(true);
     setError("");
 
-    setRubricScore(0);
-    setExtraScore(0);
-    setObservations("");
-
     setLoading(true);
     try {
       const detail = await juryFinalBookingDetail(b.id);
       setActiveBooking(detail.booking);
       setEvaluations(detail.evaluations ?? []);
+
+      if (detail.booking.students?.length) {
+        const initial: Record<number, StudentEvalState> = {};
+        detail.booking.students.forEach((s) => {
+          initial[s.id] = {
+            rubricScore: 0,
+            extraScore: 0,
+            observations: "",
+          };
+        });
+        setStudentEvals(initial);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveEvaluation = async () => {
-    if (!activeBooking) return;
+  const saveStudentEvaluation = async (studentId: number) => {
+    const ev = studentEvals[studentId];
+    if (!ev) return;
 
-    setError("");
+    if (ev.rubricScore < 0 || ev.rubricScore > 50)
+      return alert("Rúbrica debe estar entre 0 y 50");
 
-    const rs = Number(rubricScore);
-    const es = Number(extraScore);
-
-    if (!Number.isFinite(rs) || rs < 0 || rs > 50) return setError("La nota de rúbrica debe estar entre 0 y 50.");
-    if (!Number.isFinite(es) || es < 0 || es > 50) return setError("La nota extra debe estar entre 0 y 50.");
+    if (ev.extraScore < 0 || ev.extraScore > 50)
+      return alert("Extra debe estar entre 0 y 50");
 
     setLoading(true);
     try {
-      await juryFinalEvaluate(activeBooking.id, {
-        rubricScore: rs,
-        extraScore: es,
-        observations: observations.trim() || null,
+      await juryFinalEvaluate(activeBooking!.id, {
+        studentId,
+        rubricScore: ev.rubricScore,
+        extraScore: ev.extraScore,
+        observations: ev.observations || null,
       });
 
-      const detail = await juryFinalBookingDetail(activeBooking.id);
-      setActiveBooking(detail.booking);
+      const detail = await juryFinalBookingDetail(activeBooking!.id);
       setEvaluations(detail.evaluations ?? []);
-      await load();
-
-      alert("Evaluación guardada ✅");
-      setOpenEval(false);
+      alert("Nota guardada correctamente ✅");
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? "No se pudo guardar evaluación");
+      alert(e?.response?.data?.message || "Error al guardar");
     } finally {
       setLoading(false);
     }
@@ -204,533 +219,447 @@ export default function FinalDefenseJuryPage() {
     }
   };
 
-  const averageFrom = (evs: FinalDefenseEvaluationDto[]) => {
-    if (!evs?.length) return null;
-    const sum = evs.reduce((acc, x) => acc + (Number(x.totalScore) || (x.rubricScore + x.extraScore)), 0);
-    return Math.round((sum / evs.length) * 100) / 100;
-  };
-
+  // 🟢 PASO 3 — Reemplazo de getInitials() para manejar fullName
   const getInitials = () => {
-    if (juryInfo?.name) {
-      const parts = juryInfo.name.split(" ");
-      if (parts.length >= 2) {
-        return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
-      }
-      return juryInfo.name.charAt(0).toUpperCase();
+    const name = juryInfo?.name?.trim();
+
+    if (!name) return "U"; // Usuario genérico
+
+    const parts = name.split(" ").filter(Boolean);
+
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     }
-    if (juryInfo?.username) {
-      return juryInfo.username.charAt(0).toUpperCase();
-    }
-    return "J";
+
+    return parts[0][0].toUpperCase();
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", background: "#f5f7f9", display: "flex", flexDirection: "column" }}>
-      {/* HEADER DELGADO */}
-      <AppBar position="static" sx={{ bgcolor: VERDE_INSTITUCIONAL, elevation: 2, zIndex: 1100 }}>
-        <Toolbar sx={{ justifyContent: "space-between", px: { md: 5 }, minHeight: "56px !important", py: 0.8 }}>
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "#fff", lineHeight: 1 }}>
-              Defensa Final
-            </Typography>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", fontWeight: 700, fontSize: "0.65rem" }}>
-              PANEL DE JURADO {periodId ? `— Periodo: ${periodId}` : ""}
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-            <Button 
-              variant="contained" 
-              size="small"
-              startIcon={<ArrowBackIosNewRoundedIcon sx={{ fontSize: '12px !important' }} />}
-              onClick={() => nav("/jury/predefense")} 
-              sx={{ 
-                bgcolor: "#fff", 
-                color: VERDE_INSTITUCIONAL, 
-                fontWeight: 900, 
-                borderRadius: "50px", 
-                px: 2, 
-                fontSize: "0.75rem", 
-                textTransform: 'none', 
-                "&:hover": { bgcolor: "#f1f2f6" } 
-              }}
-            >
-              Atrás
-            </Button>
-
-            <IconButton
-              onClick={() => setDrawerOpen(true)}
-              sx={{
-                color: "white",
-                "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-                p: 0,
-              }}
-            >
-              <Avatar
-                src={photoPreview || undefined}
-                sx={{
-                  width: 40,
-                  height: 40,
-                  bgcolor: "white",
-                  color: VERDE_INSTITUCIONAL,
-                  fontWeight: 900,
-                }}
-              >
-                {getInitials()}
-              </Avatar>
-            </IconButton>
-          </Box>
-        </Toolbar>
-      </AppBar>
-
-      {/* CONTENIDO */}
-      <Box sx={{ flex: 1, py: 3 }}>
-        <Container maxWidth="md">
-          <Card
-            sx={{
-              borderRadius: "25px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
-              border: "1px solid #e1e8ed",
-            }}
-          >
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL, mb: 2.5 }}>
-                Mis Defensas Finales ({bookings.length})
-              </Typography>
-
-              {bookings.map((b) => (
-                <Paper
-                  key={b.id}
-                  elevation={0}
-                  sx={{
-                    p: 2.5,
-                    mb: 2,
-                    border: "2px solid #e9ecef",
-                    borderRadius: "20px",
-                    transition: "all 0.2s",
-                    "&:hover": { bgcolor: "#f8f9fa", transform: "scale(1.01)", boxShadow: "0 5px 15px rgba(0,0,0,0.08)" },
-                  }}
-                >
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "start", mb: 1.5 }}>
-                    <Box>
-                      <Typography sx={{ fontWeight: 900, fontSize: "1.1rem" }}>
-                        Defensa #{b.id}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: "#666", fontWeight: 700 }}>
-                        {b.startsAt} → {b.endsAt}
-                      </Typography>
-                    </Box>
-                    <Chip
-                      icon={<AssessmentIcon sx={{ fontSize: "1rem" }} />}
-                      label="Defensa Final"
-                      size="small"
-                      sx={{
-                        bgcolor: VERDE_INSTITUCIONAL,
-                        color: "white",
-                        fontWeight: 900,
-                        fontSize: "0.7rem"
-                      }}
-                    />
-                  </Box>
-
-                  <Divider sx={{ my: 1.5 }} />
-
-                  <Stack spacing={0.8}>
-                    <Typography variant="body2" sx={{ fontSize: "0.9rem" }}>
-                      <strong>Proyecto:</strong> {b.projectName ?? "-"}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontSize: "0.9rem" }}>
-                      <strong>Carrera:</strong> {b.careerName ?? "-"}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontSize: "0.9rem" }}>
-                      <strong>Estudiantes:</strong> {b.students?.map((s) => `${s.fullName} (${s.dni})`).join(" / ")}
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontSize: "0.9rem" }}>
-                      <strong>Jurados:</strong> {b.jury?.map((j) => j.fullName).join(" / ")}
-                    </Typography>
-                  </Stack>
-
-                  <Box sx={{ display: "flex", gap: 1.5, mt: 2.5, flexWrap: "wrap" }}>
-                    <Button
-                      onClick={() => openEvaluate(b)}
-                      variant="contained"
-                      startIcon={<AssessmentIcon />}
-                      disabled={loading}
-                      sx={{
-                        bgcolor: VERDE_INSTITUCIONAL,
-                        fontWeight: 900,
-                        borderRadius: "50px",
-                        textTransform: "none",
-                        py: 1,
-                        px: 2.5,
-                        "&:hover": { bgcolor: "#007070", transform: "scale(1.05)" },
-                      }}
-                    >
-                      Evaluar
-                    </Button>
-
-                    <Button
-                      onClick={() => handleDownloadActa(b.id)}
-                      variant="outlined"
-                      startIcon={<DownloadIcon />}
-                      disabled={loading}
-                      sx={{
-                        borderColor: VERDE_INSTITUCIONAL,
-                        color: VERDE_INSTITUCIONAL,
-                        fontWeight: 900,
-                        borderRadius: "50px",
-                        textTransform: "none",
-                        py: 1,
-                        px: 2.5,
-                        "&:hover": {
-                          borderColor: VERDE_INSTITUCIONAL,
-                          bgcolor: "rgba(0, 139, 139, 0.05)",
-                        },
-                      }}
-                    >
-                      Descargar Acta
-                    </Button>
-                  </Box>
-                </Paper>
-              ))}
-
-              {!bookings.length && (
-                <Typography sx={{ color: "#777", textAlign: "center", py: 4, fontStyle: "italic" }}>
-                  No tienes defensas asignadas todavía
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Container>
-      </Box>
-
-      {/* FOOTER DELGADO */}
-      <Box sx={{ width: "100%", bgcolor: VERDE_INSTITUCIONAL, color: "#fff", py: 0.5, mt: "auto", textAlign: "center" }}>
-        <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.8, fontSize: "0.65rem" }}>
-          © {new Date().getFullYear()} - Panel de Jurado - Defensa Final
-        </Typography>
-      </Box>
-
-      {/* DRAWER PERFIL */}
-      <Drawer
-        anchor="right"
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        PaperProps={{
-          sx: {
-            width: { xs: "100%", sm: 360 },
-            bgcolor: "rgba(255, 255, 255, 0.98)",
-            backdropFilter: "blur(10px)",
-          },
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+      {/* SIDEBAR PARA COORDINADOR */}
+      {isCoordinator ? (
+  <CoordinatorSidebar
+    coordinatorName={juryInfo.name}
+    coordinatorInitials={getInitials()}
+    coordinatorEmail={juryInfo.email}
+    coordinatorUsername={juryInfo.username}
+    coordinatorRole={juryInfo.role}
+    photoPreview={photoPreview}
+    onLogout={handleLogout}
+    onPhotoChange={handlePhotoChange}
+  />
+) : (
+  <TutorSidebar
+    onLogout={handleLogout}
+    verde={VERDE_INSTITUCIONAL}
+    periodId={periodId}
+  />
+)}
+      {/* CONTENIDO PRINCIPAL */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minHeight: "100vh",
+          background: "#f5f7f9",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        {/* HEADER */}
+        <Box
+          sx={{
+            bgcolor: VERDE_INSTITUCIONAL,
+            color: "white",
+            py: 2,
+            px: 3,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          }}
+        >
           <Box
             sx={{
-              p: 2,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              borderBottom: "1px solid #eee",
             }}
           >
-            <Typography variant="h6" sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL }}>
-              Mi Perfil
-            </Typography>
-
-            <Box sx={{ display: "flex", gap: 0.5 }}>
-              <Tooltip title="Cerrar Sesión" arrow>
-                <IconButton
-                  onClick={handleLogout}
-                  size="small"
-                  sx={{ color: "#d32f2f", "&:hover": { bgcolor: "rgba(211, 47, 47, 0.08)" } }}
-                >
-                  <LogoutOutlined fontSize="small" />
-                </IconButton>
-              </Tooltip>
-
-              <IconButton onClick={() => setDrawerOpen(false)} size="small">
-                <CloseIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          </Box>
-
-          <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
-            <Box sx={{ textAlign: "center", mb: 2.5 }}>
-              <Avatar
-                src={photoPreview || undefined}
-                sx={{
-                  width: 90,
-                  height: 90,
-                  fontSize: "2.2rem",
-                  mx: "auto",
-                  mb: 1.5,
-                  bgcolor: VERDE_INSTITUCIONAL,
-                  border: "3px solid #f0f2f5",
-                }}
-              >
-                {getInitials()}
-              </Avatar>
-
-              <Typography variant="h6" sx={{ fontWeight: 900, mb: 0.5, fontSize: "1rem" }}>
-                {juryInfo?.name || juryInfo?.username || "Usuario"}
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>
+                Defensa Final
               </Typography>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handlePhotoChange}
-                accept="image/*"
-                style={{ display: "none" }}
-              />
-
-              <Button
-                variant="text"
-                startIcon={<PhotoCameraIcon fontSize="small" />}
-                onClick={() => fileInputRef.current?.click()}
-                sx={{
-                  color: VERDE_INSTITUCIONAL,
-                  textTransform: "none",
-                  fontWeight: 600,
-                  fontSize: "0.75rem",
-                  "&:hover": { bgcolor: "rgba(0, 139, 139, 0.05)" },
-                }}
-              >
-                Cambiar Foto
-              </Button>
+              <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                Panel de Jurado {periodId ? `— Periodo: ${periodId}` : ""}
+              </Typography>
             </Box>
 
-            <Divider sx={{ mb: 2 }} />
-
-            <Stack spacing={1.2}>
-              <Paper elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248, 249, 250, 0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                  <AccountCircleIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>
-                      Username
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: juryInfo?.username ? "#212529" : "#adb5bd", fontSize: "0.813rem" }}>
-                      {juryInfo?.username || "Sin asignar"}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Paper>
-
-              <Paper elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248, 249, 250, 0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                  <PersonIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>
-                      Nombre Completo
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: juryInfo?.name ? "#212529" : "#adb5bd", fontSize: "0.813rem" }}>
-                      {juryInfo?.name || "Sin asignar"}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Paper>
-
-              <Paper elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248, 249, 250, 0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                  <EmailIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem" }}>
-                      Email
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: juryInfo?.email ? "#212529" : "#adb5bd", fontSize: "0.813rem", wordBreak: "break-word" }}>
-                      {juryInfo?.email || "Sin asignar"}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Paper>
-
-              <Paper elevation={0} sx={{ p: 1.2, bgcolor: "rgba(248, 249, 250, 0.9)", borderRadius: 5, border: "1px solid #e9ecef" }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                  <BadgeIcon sx={{ color: VERDE_INSTITUCIONAL, fontSize: 20 }} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#6c757d", fontWeight: 600, fontSize: "0.65rem", mb: 0.3, display: "block" }}>
-                      Rol
-                    </Typography>
-                    <Chip
-                      label={juryInfo?.role || "Sin asignar"}
-                      size="small"
-                      sx={{ bgcolor: VERDE_INSTITUCIONAL, color: "white", fontWeight: 700, fontSize: "0.7rem", height: "22px" }}
-                    />
-                  </Box>
-                </Box>
-              </Paper>
-            </Stack>
+            {/* AVATAR SOLO SI NO ES COORDINADOR */}
+            {!isCoordinator && (
+              <IconButton onClick={() => setDrawerOpen(true)} sx={{ p: 0 }}>
+                <Avatar
+                  src={photoPreview || undefined}
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    bgcolor: "white",
+                    color: VERDE_INSTITUCIONAL,
+                    fontWeight: 900,
+                  }}
+                >
+                  {getInitials()}
+                </Avatar>
+              </IconButton>
+            )}
           </Box>
         </Box>
-      </Drawer>
+
+        {/* CONTENIDO */}
+        <Box sx={{ flex: 1, py: 3 }}>
+          <Container maxWidth="lg">
+            <Card
+              sx={{
+                borderRadius: "25px",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
+                border: "1px solid #e1e8ed",
+              }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Typography
+                  variant="h6"
+                  sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL, mb: 2.5 }}
+                >
+                  Mis Defensas Finales ({bookings.length})
+                </Typography>
+                {bookings.map((b) => (
+                  <Paper
+                    key={b.id}
+                    elevation={0}
+                    sx={{
+                      p: 2.5,
+                      mb: 2,
+                      border: "2px solid #e9ecef",
+                      borderRadius: "20px",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1.5 }}>
+                      <Typography sx={{ fontWeight: 900, fontSize: "1.1rem" }}>
+                        Defensa #{b.id}
+                      </Typography>
+                      <Chip
+                        label="Defensa Final"
+                        size="small"
+                        sx={{
+                          bgcolor: VERDE_INSTITUCIONAL,
+                          color: "white",
+                          fontWeight: 900,
+                        }}
+                      />
+                    </Box>
+                    <Stack spacing={0.8} sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Proyecto:</strong> {b.projectName || "-"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Estudiantes:</strong>{" "}
+                        {b.students?.map((s) => s.fullName).join(" / ")}
+                      </Typography>
+                    </Stack>
+                    <Box sx={{ display: "flex", gap: 1.5 }}>
+                      <Button
+                        onClick={() => openEvaluate(b)}
+                        variant="contained"
+                        startIcon={<AssessmentIcon />}
+                        sx={{
+                          bgcolor: VERDE_INSTITUCIONAL,
+                          borderRadius: "50px",
+                          fontWeight: 900,
+                        }}
+                      >
+                        Evaluar
+                      </Button>
+                      <Button
+                        onClick={() => handleDownloadActa(b.id)}
+                        variant="outlined"
+                        startIcon={<DownloadIcon />}
+                        sx={{
+                          color: VERDE_INSTITUCIONAL,
+                          borderColor: VERDE_INSTITUCIONAL,
+                          borderRadius: "50px",
+                          fontWeight: 900,
+                        }}
+                      >
+                        Acta
+                      </Button>
+                    </Box>
+                  </Paper>
+                ))}
+              </CardContent>
+            </Card>
+          </Container>
+        </Box>
+
+        {/* FOOTER */}
+        <Box
+          sx={{
+            bgcolor: VERDE_INSTITUCIONAL,
+            color: "white",
+            py: 2,
+            textAlign: "center",
+          }}
+        >
+          <Typography variant="body2">© 2025 - Panel de Jurado</Typography>
+        </Box>
+      </Box>
 
       {/* MODAL EVALUAR */}
-      <Dialog 
-        open={openEval} 
-        onClose={() => setOpenEval(false)} 
-        maxWidth="sm" 
+      <Dialog
+        open={openEval}
+        onClose={() => setOpenEval(false)}
+        maxWidth="lg"
         fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: "25px",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-          }
-        }}
+        PaperProps={{ sx: { borderRadius: "25px" } }}
       >
-        <DialogTitle sx={{ fontWeight: 900, color: VERDE_INSTITUCIONAL, borderBottom: "1px solid #f1f2f6", py: 2 }}>
-          Evaluar Defensa Final {activeBooking ? `#${activeBooking.id}` : ""}
+        <DialogTitle
+          sx={{
+            fontWeight: 900,
+            color: VERDE_INSTITUCIONAL,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          Evaluar Defensa {activeBooking ? `#${activeBooking.id}` : ""}
+          <Button
+            onClick={async () => {
+              try {
+                const blob = await juryFinalDownloadRubricPdf(activeBooking!.id);
+                window.open(window.URL.createObjectURL(blob), "_blank");
+              } catch {
+                alert("No se pudo abrir rúbrica.");
+              }
+            }}
+            variant="text"
+            startIcon={<VisibilityIcon />}
+            sx={{ color: VERDE_INSTITUCIONAL, fontWeight: 900 }}
+          >
+            Ver Rúbrica PDF
+          </Button>
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: 3 }}>
-          {!activeBooking ? (
-            <Typography sx={{ color: "#777" }}>Sin defensa seleccionada.</Typography>
-          ) : (
-            <>
-              <Typography sx={{ fontWeight: 900, fontSize: "1rem" }}>
-                {activeBooking.startsAt} → {activeBooking.endsAt}
-              </Typography>
+        <DialogContent dividers sx={{ p: 3, bgcolor: "#f8f9fa" }}>
+          {activeBooking && (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns:
+                  activeBooking.students.length > 1 ? "1fr 1fr" : "1fr",
+                gap: 3,
+              }}
+            >
+              {activeBooking.students.map((s) => {
+                const ev = studentEvals[s.id];
+                const total = (ev?.rubricScore || 0) + (ev?.extraScore || 0);
+                const verdict = total >= 70 ? "APROBADO" : "REPROBADO";
+                const evalsStudent = evaluations.filter((e) => e.studentId === s.id);
 
-              <Typography sx={{ color: "#666", mt: 1, fontWeight: 600 }}>
-                Estudiantes: {activeBooking.students?.map((s) => s.fullName).join(" / ")}
-              </Typography>
-
-              <Button
-                onClick={async () => {
-                  if (!activeBooking) return;
-                  try {
-                    const blob = await juryFinalDownloadRubricPdf(activeBooking.id);
-                    const url = window.URL.createObjectURL(blob);
-                    window.open(url, "_blank");
-                  } catch (e: any) {
-                    alert(e?.response?.data?.message ?? "No se pudo abrir la rúbrica (tal vez no existe).");
-                  }
-                }}
-                variant="outlined"
-                fullWidth
-                startIcon={<VisibilityIcon />}
-                sx={{
-                  mt: 2.5,
-                  mb: 2,
-                  borderColor: VERDE_INSTITUCIONAL,
-                  color: VERDE_INSTITUCIONAL,
-                  fontWeight: 900,
-                  borderRadius: "50px",
-                  textTransform: "none",
-                  py: 1.2,
-                  "&:hover": { borderColor: VERDE_INSTITUCIONAL, bgcolor: "rgba(0, 139, 139, 0.05)" }
-                }}
-                disabled={loading || !activeBooking}
-              >
-                Ver Rúbrica (PDF)
-              </Button>
-
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mt: 2 }}>
-                <TextField
-                  label="Nota rúbrica (0–50)"
-                  type="number"
-                  value={rubricScore}
-                  onChange={(e) => setRubricScore(Number(e.target.value))}
-                  inputProps={{ min: 0, max: 50 }}
-                  size="small"
-                />
-                <TextField
-                  label="Nota extra (0–50)"
-                  type="number"
-                  value={extraScore}
-                  onChange={(e) => setExtraScore(Number(e.target.value))}
-                  inputProps={{ min: 0, max: 50 }}
-                  size="small"
-                />
-              </Box>
-
-              <Box sx={{ mt: 2, p: 2, bgcolor: "#f0fff4", borderRadius: 2, border: "1px solid #c6f6d5" }}>
-                <Typography sx={{ fontWeight: 900, fontSize: "0.95rem" }}>
-                  Total: <span style={{ fontSize: "1.2rem", color: VERDE_INSTITUCIONAL }}>{total}/100</span>
-                </Typography>
-                <Typography sx={{ fontWeight: 900, fontSize: "0.9rem", mt: 0.5 }}>
-                  Veredicto: <span style={{ color: autoVerdict === "APROBADO" ? "#2e7d32" : "#c62828" }}>{autoVerdict}</span>
-                </Typography>
-              </Box>
-
-              <TextField
-                label="Observaciones"
-                value={observations}
-                onChange={(e) => setObservations(e.target.value)}
-                fullWidth
-                multiline
-                minRows={3}
-                size="small"
-                sx={{ mt: 2 }}
-              />
-
-              {error && (
-                <Typography sx={{ color: "#c62828", mt: 1.5, fontWeight: 700, fontSize: "0.9rem" }}>
-                  ⚠️ {error}
-                </Typography>
-              )}
-
-              <Box sx={{ mt: 3, background: "#fafafa", border: "1px solid #eee", borderRadius: "20px", p: 2.5 }}>
-                <Typography sx={{ fontWeight: 900, mb: 1.5, fontSize: "0.95rem" }}>
-                  Evaluaciones Registradas ({evaluations.length})
-                </Typography>
-
-                {evaluations.map((ev) => (
-                  <Box key={ev.id} sx={{ border: "1px solid #eee", borderRadius: "16px", p: 1.5, mb: 1.5, bgcolor: "#fff" }}>
-                    <Typography sx={{ fontWeight: 900, fontSize: "0.9rem" }}>
-                      {ev.juryName} — <span style={{ color: VERDE_INSTITUCIONAL }}>{ev.totalScore}/100</span>
+                return (
+                  <Paper
+                    key={s.id}
+                    sx={{
+                      p: 3,
+                      borderRadius: 4,
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <Typography
+                      variant="h6"
+                      sx={{ fontWeight: 900, mb: 0.5, color: VERDE_INSTITUCIONAL }}
+                    >
+                      {s.fullName}
                     </Typography>
-                    <Typography sx={{ color: "#666", fontSize: "0.85rem", mt: 0.3 }}>
-                      Rúbrica: {ev.rubricScore}/50 | Extra: {ev.extraScore}/50
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      Identificación: {s.dni}
                     </Typography>
-                    {ev.observations && (
-                      <Typography sx={{ color: "#666", fontSize: "0.85rem", mt: 0.5, fontStyle: "italic" }}>
-                        💬 {ev.observations}
+
+                    <Box
+                      sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}
+                    >
+                      <TextField
+                        label="Rúbrica (0–50)"
+                        type="number"
+                        fullWidth
+                        value={ev?.rubricScore || 0}
+                        onChange={(e) =>
+                          setStudentEvals({
+                            ...studentEvals,
+                            [s.id]: {
+                              ...ev,
+                              rubricScore: Number(e.target.value),
+                            },
+                          })
+                        }
+                      />
+                      <TextField
+                        label="Extra (0–50)"
+                        type="number"
+                        fullWidth
+                        value={ev?.extraScore || 0}
+                        onChange={(e) =>
+                          setStudentEvals({
+                            ...studentEvals,
+                            [s.id]: {
+                              ...ev,
+                              extraScore: Number(e.target.value),
+                            },
+                          })
+                        }
+                      />
+                    </Box>
+
+                    <Box
+                      sx={{
+                        mt: 2,
+                        p: 2,
+                        bgcolor: total >= 70 ? "#f0fff4" : "#fff5f5",
+                        borderRadius: 2,
+                        textAlign: "center",
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: 900, fontSize: "1.1rem" }}>
+                        Total: {total}/100 —{" "}
+                        <span
+                          style={{
+                            color: verdict === "APROBADO" ? "#2e7d32" : "#d32f2f",
+                          }}
+                        >
+                          {verdict}
+                        </span>
                       </Typography>
-                    )}
-                  </Box>
-                ))}
+                    </Box>
 
-                {evaluations.length > 0 && (
-                  <Typography sx={{ mt: 1.5, fontWeight: 900, fontSize: "0.95rem", color: VERDE_INSTITUCIONAL }}>
-                    Promedio Total: {averageFrom(evaluations) ?? "-"}/100
-                  </Typography>
-                )}
+                    <TextField
+                      label="Observaciones"
+                      fullWidth
+                      multiline
+                      minRows={2}
+                      sx={{ mt: 2 }}
+                      placeholder="Comentarios sobre el desempeño..."
+                      value={ev?.observations || ""}
+                      onChange={(e) =>
+                        setStudentEvals({
+                          ...studentEvals,
+                          [s.id]: {
+                            ...ev,
+                            observations: e.target.value,
+                          },
+                        })
+                      }
+                    />
 
-                {!evaluations.length && (
-                  <Typography sx={{ color: "#777", textAlign: "center", py: 2, fontStyle: "italic" }}>
-                    Aún no hay evaluaciones registradas
-                  </Typography>
-                )}
-              </Box>
-            </>
+                    <Box sx={{ mt: 3, mb: 2 }}>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{ fontWeight: 900, mb: 1, color: "text.secondary" }}
+                      >
+                        CALIFICACIONES DE OTROS JURADOS
+                      </Typography>
+                      <Divider sx={{ mb: 1.5 }} />
+                      {evalsStudent.length > 0 ? (
+                        evalsStudent.map((e) => (
+                          <Box
+                            key={e.id}
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              mb: 0.5,
+                            }}
+                          >
+                            <Typography variant="body2">• {e.juryName}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                              {e.totalScore}/100
+                            </Typography>
+                          </Box>
+                        ))
+                      ) : (
+                        <Typography variant="caption" color="text.disabled">
+                          Aún no hay otras evaluaciones.
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      sx={{
+                        mt: 1,
+                        bgcolor: VERDE_INSTITUCIONAL,
+                        color: "white",
+                        fontWeight: 900,
+                        borderRadius: "50px",
+                        py: 1.2,
+                        "&:hover": { bgcolor: "#006666" },
+                      }}
+                      onClick={() => saveStudentEvaluation(s.id)}
+                    >
+                      Guardar Nota
+                    </Button>
+                  </Paper>
+                );
+              })}
+            </Box>
           )}
         </DialogContent>
-
-        <DialogActions sx={{ p: 2, borderTop: "1px solid #f1f2f6" }}>
+        <DialogActions sx={{ p: 2.5, bgcolor: "#f8f9fa" }}>
           <Button
             onClick={() => setOpenEval(false)}
-            sx={{ borderRadius: "50px", textTransform: "none", fontWeight: 900, px: 3 }}
+            sx={{ fontWeight: 900, color: "text.secondary" }}
           >
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSaveEvaluation}
-            variant="contained"
-            disabled={loading || !activeBooking}
-            sx={{
-              bgcolor: VERDE_INSTITUCIONAL,
-              fontWeight: 900,
-              borderRadius: "50px",
-              textTransform: "none",
-              px: 3,
-              "&:hover": { bgcolor: "#007070", transform: "scale(1.05)" },
-            }}
-          >
-            Guardar Evaluación
+            Cerrar Modal
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* DRAWER PERFIL SOLO PARA NO-COORDINADORES */}
+      {!isCoordinator && (
+        <Drawer
+          anchor="right"
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          PaperProps={{ sx: { width: 320 } }}
+        >
+          <Box sx={{ p: 3 }}>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 900, mb: 2, color: VERDE_INSTITUCIONAL }}
+            >
+              Mi Perfil
+            </Typography>
+            <Avatar
+              src={photoPreview || undefined}
+              sx={{
+                width: 80,
+                height: 80,
+                mx: "auto",
+                mb: 2,
+                bgcolor: VERDE_INSTITUCIONAL,
+              }}
+            >
+              {getInitials()}
+            </Avatar>
+            <Typography align="center" sx={{ fontWeight: 900 }}>
+              {juryInfo.name}
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+            <Button
+              fullWidth
+              onClick={handleLogout}
+              color="error"
+              startIcon={<LogoutOutlined />}
+            >
+              Cerrar Sesión
+            </Button>
+          </Box>
+        </Drawer>
+      )}
     </Box>
   );
 }

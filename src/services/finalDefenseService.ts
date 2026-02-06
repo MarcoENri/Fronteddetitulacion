@@ -65,18 +65,20 @@ export type FinalDefenseBookingDto = {
 };
 
 export type FinalDefenseEvaluationDto = {
-  id: number;
-  bookingId: number;
-  juryUserId: number;
-  juryName: string;
+id: number;
+bookingId: number;
+studentId: number; // ✅ NUEVO
+juryUserId: number;
+juryName: string;
 
-  rubricScore: number; // 0..50
-  extraScore: number;  // 0..50
-  totalScore: number;  // 0..100
+rubricScore: number;
+extraScore: number;
+totalScore: number;
 
-  observations: string | null;
-  createdAt: string;
+observations: string | null;
+createdAt: string;
 };
+
 
 export type CreateFinalDefenseWindowRequest = {
   academicPeriodId?: number | null;
@@ -98,9 +100,10 @@ export type CreateFinalDefenseBookingRequest = {
 };
 
 export type CreateFinalDefenseEvaluationRequest = {
-  rubricScore: number; // 0..50
-  extraScore: number;  // 0..50
-  observations?: string | null;
+studentId: number; // ✅ NUEVO — obligatorio
+rubricScore: number; // 0..50
+extraScore: number;  // 0..50
+observations?: string | null;
 };
 
 // Para usuarios que serán jurados (tutores y coordinadores)
