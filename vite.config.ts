@@ -3,25 +3,11 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig({
+  base: "/",
   plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  server: {
-    proxy: {
-      // SOLO endpoints de API del backend
-      "/auth": {
-        target: "https://backendtitulacion.onrender.com",
-        changeOrigin: true,
-      },
-      "/me": {
-        target: "https://backendtitulacion.onrender.com",
-        changeOrigin: true,
-      },
-      // Si tu backend tiene otros endpoints, agrégalos aquí
-      // Por ejemplo: /api, /students, /coordinators, etc.
     },
   },
 });
