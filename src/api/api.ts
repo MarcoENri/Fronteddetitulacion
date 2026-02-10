@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: "http://26.146.215.130:8081",
+  baseURL: "https://backendtitulacion.onrender.com",
 });
 
 api.interceptors.request.use(
