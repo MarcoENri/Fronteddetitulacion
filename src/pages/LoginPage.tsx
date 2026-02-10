@@ -280,10 +280,10 @@ export default function LoginPage() {
               </Button>
 
               <Box sx={{ display: "flex", justifyContent: "center", gap: 1.5, mt: 1 }}>
-                <Social icon={<FaFacebookF />} color="#1877F2" link="https://facebook.com" />
-                <Social icon={<FaInstagram />} color="#E4405F" link="https://instagram.com" />
-                <Social icon={<FaWhatsapp />} color="#25D366" link="https://whatsapp.com" />
-                <Social icon={<FaTiktok />} color="#000" link="https://tiktok.com" />
+                <Social icon={<FaFacebookF />} color="#1877F2" link="https://www.facebook.com/institutosudamericano" />
+                <Social icon={<FaInstagram />} color="#E4405F" link="https://www.instagram.com/itsudamericano"/>
+                <Social icon={<FaWhatsapp />} color="#25D366" link="https://api.whatsapp.com/send/?phone=593996976449"/>
+                <Social icon={<FaTiktok />} color="#000" link="https://www.tiktok.com/@itsudamericano"/>
               </Box>
             </Box>
           </Box>
