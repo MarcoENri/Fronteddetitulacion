@@ -13,11 +13,11 @@ export default defineConfig({
     proxy: {
       // SOLO endpoints de API del backend
       "/auth": {
-        target: "http://26.146.215.130:8081",
+        target: "https://backendtitulacion.onrender.com",
         changeOrigin: true,
       },
       "/me": {
-        target: "http://26.146.215.130:8081",
+        target: "https://backendtitulacion.onrender.com",
         changeOrigin: true,
       },
       // Si tu backend tiene otros endpoints, agrégalos aquí
